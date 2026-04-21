@@ -1,0 +1,12 @@
+target/
+.idea/
+.vscode/
+*.iml
+.DS_Store
+.env
+.mvn/apache-maven-*/
+.mvn/*.tar.gz
+.codex
+frontend-admin/
+frontend-store/
+frontend-store.zip

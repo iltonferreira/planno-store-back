@@ -1,0 +1,51 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: jdbc:h2:mem:planno_store_test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+  sql:
+    init:
+      mode: never
+
+app:
+  payment:
+    credentials-encryption-key-base64: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+    oauth:
+      state-ttl-minutes: 10
+    mercado-pago:
+      mock-enabled: true
+      client-id: test-client-id
+      client-secret: test-client-secret
+      access-token: test-access-token
+      webhook-secret: test-webhook-secret
+      webhook-url: http://localhost:8080/api/v1/public/webhooks/mercado-pago
+      success-url: http://localhost:3000/checkout/success
+      pending-url: http://localhost:3000/checkout/pending
+      failure-url: http://localhost:3000/checkout/failure
+      api-base-url: https://api.mercadopago.com
+      auth-base-url: https://auth.mercadopago.com
+  media:
+    supabase:
+      mock-enabled: true
+      bucket: store-assets-test
+      store-image-folder: stores
+  security:
+    jwt:
+      secret-base64: dGVzdC1zZWNyZXQtdGVzdC1zZWNyZXQtdGVzdC1zZWNyZXQtdGVzdA==
+      expiration-minutes: 180
+    cors:
+      allowed-origins: http://localhost:4200,http://localhost:4201
+  bootstrap:
+    store:
+      enabled: false
+    admin:
+      enabled: false
