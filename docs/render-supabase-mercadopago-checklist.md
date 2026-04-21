@@ -5,6 +5,7 @@
 - Configurar `DB_URL`, `DB_USERNAME` e `DB_PASSWORD` no Render.
 - Garantir SSL no `DB_URL` compativel com Supabase.
 - Usar [render.yaml](/home/iltonferreira/dev/projetos/planno-store/planno-store-back/render.yaml:1) para subir somente o backend.
+- O blueprint usa `runtime: docker` com [Dockerfile](/home/iltonferreira/dev/projetos/planno-store/planno-store-back/Dockerfile:1), porque `runtime: java` nao e aceito pelo schema atual do Render.
 - Configurar `SPRING_PROFILES_ACTIVE=prod`.
 - Configurar `APP_CORS_ALLOWED_ORIGINS` com os domínios reais do frontend.
 - Configurar `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_MEDIA_SUPABASE_PUBLIC_BASE_URL`, `APP_MEDIA_SUPABASE_BUCKET` e `APP_MEDIA_SUPABASE_STORE_IMAGE_FOLDER`.

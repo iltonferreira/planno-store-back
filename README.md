@@ -326,7 +326,8 @@ Configuração de media com Supabase Storage:
 Deploy no Render:
 
 - O arquivo [render.yaml](/home/iltonferreira/dev/projetos/planno-store/planno-store-back/render.yaml:1) sobe apenas o backend.
-- O start command publica na porta do Render via `server.port=$PORT`.
+- O Blueprint usa `runtime: docker`, porque o schema atual do Render nao aceita `runtime: java`.
+- O [Dockerfile](/home/iltonferreira/dev/projetos/planno-store/planno-store-back/Dockerfile:1) empacota a app em Java 21 e publica na porta do Render via `server.port=$PORT`.
 - Para ambiente produtivo, use `SPRING_PROFILES_ACTIVE=prod`.
 
 ## Endpoints desta fase

@@ -1,11 +1,11 @@
 services:
   - type: web
     name: planno-store-back
-    runtime: java
+    runtime: docker
     plan: starter
     rootDir: .
-    buildCommand: ./mvnw -DskipTests clean package
-    startCommand: java -Dserver.port=$PORT -jar target/planno-store-back-0.0.1-SNAPSHOT.jar
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     autoDeploy: true
     envVars:
       - key: SPRING_PROFILES_ACTIVE
