@@ -301,8 +301,10 @@ Bootstrap opcional da loja inicial:
 - `APP_BOOTSTRAP_STORE_TIMEZONE` default `America/Sao_Paulo`
 - `APP_BOOTSTRAP_STORE_DESCRIPTION`
 - `APP_BOOTSTRAP_STORE_LOGO_URL`
+- `APP_BOOTSTRAP_STORE_BANNER_URL`
 - `APP_BOOTSTRAP_STORE_PRIMARY_COLOR`
 - `APP_BOOTSTRAP_STORE_SECONDARY_COLOR`
+- `APP_BOOTSTRAP_STORE_COMMISSION_RATE` default `2.50`
 
 Bootstrap opcional do admin inicial:
 
@@ -311,6 +313,21 @@ Bootstrap opcional do admin inicial:
 - `APP_BOOTSTRAP_ADMIN_PASSWORD`
 - `APP_BOOTSTRAP_ADMIN_FIRST_NAME` default `Admin`
 - `APP_BOOTSTRAP_ADMIN_LAST_NAME` default `Planno`
+
+Configuração de media com Supabase Storage:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `APP_MEDIA_SUPABASE_PUBLIC_BASE_URL` default `SUPABASE_URL`
+- `APP_MEDIA_SUPABASE_BUCKET` default `store-assets`
+- `APP_MEDIA_SUPABASE_STORE_IMAGE_FOLDER` default `stores`
+- `APP_MEDIA_SUPABASE_MOCK_ENABLED` default `false`
+
+Deploy no Render:
+
+- O arquivo [render.yaml](/home/iltonferreira/dev/projetos/planno-store/planno-store-back/render.yaml:1) sobe apenas o backend.
+- O start command publica na porta do Render via `server.port=$PORT`.
+- Para ambiente produtivo, use `SPRING_PROFILES_ACTIVE=prod`.
 
 ## Endpoints desta fase
 
