@@ -404,6 +404,7 @@ Protegidos:
 - `GET /api/v1/admin/payments/mercado-pago/account`
 - `GET /api/v1/admin/payments/mercado-pago/capabilities`
 - `POST /api/v1/admin/payments/mercado-pago/disconnect`
+- `POST /internal/stores/provision` (Hub, service token)
 - `GET /api/v1/admin/dashboard/summary`
 - `GET /api/v1/admin/dashboard/sales-by-day`
 - `GET /api/v1/admin/dashboard/top-products`
@@ -412,6 +413,8 @@ Protegidos:
 - `GET /api/v1/platform/dashboard/commission-by-store`
 - `GET /api/v1/platform/dashboard/sales-by-day`
 - `GET /api/v1/platform/dashboard/top-stores`
+
+O endpoint interno exige `X-Planno-Service-Token`, configurado por `APP_STORE_PROVISIONING_SERVICE_TOKEN` (mínimo 32 caracteres). Configure o mesmo segredo em `STORE_PROVISIONING_SERVICE_TOKEN` no Hub. `APP_STORE_PROVISIONING_DOMAIN_SUFFIX` define o domínio provisório (padrão `planno.store`). A requisição cria um registro de loja e uma operação idempotente; repetir a mesma chave e payload retorna os mesmos IDs. Chave reutilizada com payload diferente ou slug existente retorna `409 Conflict`. Os dados do administrador e o código de plano são registrados na operação; criação/ativação de usuário e cobrança ainda não fazem parte deste endpoint.
 
 ## Correções da base
 

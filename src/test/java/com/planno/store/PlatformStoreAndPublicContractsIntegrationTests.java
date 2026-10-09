@@ -7,9 +7,11 @@ import com.planno.store.identity.domain.User;
 import com.planno.store.inventory.dto.InventoryUpdateRequest;
 import com.planno.store.order.dto.CreateOrderRequest;
 import com.planno.store.shipping.domain.ShippingMethodType;
+import com.planno.store.shipping.dto.AddressRequest;
 import com.planno.store.shipping.dto.ShippingMethodRequest;
 import com.planno.store.store.domain.Store;
 import com.planno.store.store.dto.PlatformStoreRequest;
+import com.planno.store.store.provisioning.StoreProvisioningRequest;
 import com.planno.store.support.AbstractIntegrationTest;
 import java.math.BigDecimal;
 import java.net.URI;
@@ -33,6 +35,63 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegrationTest {
 
     private static final String CART_HEADER = "X-Cart-Token";
+    private static final String PROVISIONING_TOKEN = "test-store-provisioning-token-with-at-least-32-chars";
+
+    @Test
+    void hubShouldProvisionStoreIdempotentlyWithServiceToken() throws Exception {
+        StoreProvisioningRequest request = new StoreProvisioningRequest("hub-request-0001", "Loja Exemplo",
+                "loja-exemplo", "contato@example.com", "Maria Silva", "Empresa Exemplo", "11999990000",
+                "12345678000190", "INITIAL", "admin@example.com", "Ana Admin");
+
+        String first = mockMvc.perform(post("/internal/stores/provision")
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("READY_FOR_CUSTOMIZATION"))
+                .andExpect(jsonPath("$.storeId").isNotEmpty())
+                .andExpect(jsonPath("$.operationId").isNotEmpty())
+                .andExpect(jsonPath("$.provisionalDomain").value("loja-exemplo.planno.test"))
+                .andReturn().getResponse().getContentAsString();
+
+        mockMvc.perform(post("/internal/stores/provision")
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.storeId").value(objectMapper.readTree(first).get("storeId").asText()))
+                .andExpect(jsonPath("$.operationId").value(objectMapper.readTree(first).get("operationId").asText()));
+
+        org.assertj.core.api.Assertions.assertThat(storeRepository.count()).isEqualTo(1);
+        org.assertj.core.api.Assertions.assertThat(storeProvisioningRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void hubProvisioningShouldRejectInvalidTokenAndIdempotencyKeyReuse() throws Exception {
+        StoreProvisioningRequest request = new StoreProvisioningRequest("hub-request-0002", "Loja Protegida",
+                "loja-protegida", "contato@example.com", "Maria Silva", "Empresa Exemplo", null, null,
+                "INITIAL", "admin@example.com", "Ana Admin");
+
+        mockMvc.perform(post("/internal/stores/provision")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/internal/stores/provision")
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated());
+
+        StoreProvisioningRequest changed = new StoreProvisioningRequest("hub-request-0002", "Outra Loja",
+                "outra-loja", "contato@example.com", "Maria Silva", "Empresa Exemplo", null, null,
+                "INITIAL", "admin@example.com", "Ana Admin");
+        mockMvc.perform(post("/internal/stores/provision")
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(changed)))
+                .andExpect(status().isConflict());
+    }
 
     @Test
     void platformAdminShouldManageStoresAndCommission() throws Exception {
@@ -335,6 +394,11 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
                 .getResponse()
                 .getContentAsString();
         return UUID.fromString(objectMapper.readTree(response).get("id").asText());
+    }
+
+    private AddressRequest sampleAddress() {
+        return new AddressRequest("Cliente Teste", "Rua Principal", "100", "Apto 10", "Centro",
+                "Sao Paulo", "SP", "01001000", "BR");
     }
 
     private record Scenario(Store store, String adminToken, UUID orderId, String cartToken) {

@@ -12,6 +12,10 @@ services:
         value: prod
       - key: APP_CORS_ALLOWED_ORIGINS
         sync: false
+      - key: APP_STORE_PROVISIONING_SERVICE_TOKEN
+        sync: false
+      - key: APP_STORE_PROVISIONING_DOMAIN_SUFFIX
+        value: planno.store
       - key: DB_URL
         sync: false
       - key: DB_USERNAME

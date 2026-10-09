@@ -26,6 +26,9 @@ server:
   shutdown: graceful
 
 app:
+  store-provisioning:
+    service-token: ${APP_STORE_PROVISIONING_SERVICE_TOKEN:}
+    domain-suffix: ${APP_STORE_PROVISIONING_DOMAIN_SUFFIX:planno.store}
   store-context:
     header-name: ${APP_STORE_CONTEXT_HEADER_NAME:X-Store-Slug}
   cart:
