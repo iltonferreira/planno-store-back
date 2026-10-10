@@ -5,6 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "app.security.cors")
 public record CorsProperties(
-        List<String> allowedOrigins
+        List<String> allowedOrigins,
+        List<String> allowedOriginPatterns
 ) {
 }

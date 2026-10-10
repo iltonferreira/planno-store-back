@@ -20,6 +20,9 @@ public class Store extends AuditableEntity {
     @Column(nullable = false, unique = true, length = 150)
     private String slug;
 
+    @Column(name = "public_domain", length = 255)
+    private String publicDomain;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private StoreStatus status;
@@ -141,6 +144,12 @@ public class Store extends AuditableEntity {
 
     public String getSlug() {
         return slug;
+    }
+
+    public String getPublicDomain() { return publicDomain; }
+
+    public void setPublicDomain(String publicDomain) {
+        this.publicDomain = publicDomain == null || publicDomain.isBlank() ? null : publicDomain.trim().toLowerCase();
     }
 
     public StoreStatus getStatus() {

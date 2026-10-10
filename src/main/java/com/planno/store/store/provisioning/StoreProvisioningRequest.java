@@ -16,6 +16,7 @@ public record StoreProvisioningRequest(
         @Size(max = 32) String taxDocument,
         @NotBlank @Pattern(regexp = "INITIAL|INTERMEDIATE|ADVANCED") String planCode,
         @NotBlank @Email @Size(max = 255) String storeAdminEmail,
-        @NotBlank @Size(max = 150) String storeAdminName
+        @NotBlank @Size(max = 150) String storeAdminName,
+        @Size(max = 255) String publicDomain
 ) {
 }

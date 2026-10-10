@@ -41,7 +41,7 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
     void hubShouldProvisionStoreIdempotentlyWithServiceToken() throws Exception {
         StoreProvisioningRequest request = new StoreProvisioningRequest("hub-request-0001", "Loja Exemplo",
                 "loja-exemplo", "contato@example.com", "Maria Silva", "Empresa Exemplo", "11999990000",
-                "12345678000190", "INITIAL", "admin@example.com", "Ana Admin");
+                "12345678000190", "INITIAL", "admin@example.com", "Ana Admin", null);
 
         String first = mockMvc.perform(post("/internal/stores/provision")
                         .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
@@ -64,13 +64,30 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
 
         org.assertj.core.api.Assertions.assertThat(storeRepository.count()).isEqualTo(1);
         org.assertj.core.api.Assertions.assertThat(storeProvisioningRepository.count()).isEqualTo(1);
+        java.util.UUID storeId = java.util.UUID.fromString(objectMapper.readTree(first).get("storeId").asText());
+        org.assertj.core.api.Assertions.assertThat(storeRepository.findById(storeId).orElseThrow().getPublicDomain())
+                .isEqualTo("loja-exemplo.planno.test");
+    }
+
+    @Test
+    void hubProvisioningCannotAssignAnUnreservedExternalDomain() throws Exception {
+        StoreProvisioningRequest request = new StoreProvisioningRequest("hub-request-domain-1", "Loja Exemplo",
+                "loja-exemplo", "contato@example.com", "Maria Silva", "Empresa Exemplo", null, null,
+                "INITIAL", "admin@example.com", "Ana Admin", "cliente.com.br");
+
+        mockMvc.perform(post("/internal/stores/provision")
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict());
+        org.assertj.core.api.Assertions.assertThat(storeRepository.count()).isZero();
     }
 
     @Test
     void hubProvisioningShouldRejectInvalidTokenAndIdempotencyKeyReuse() throws Exception {
         StoreProvisioningRequest request = new StoreProvisioningRequest("hub-request-0002", "Loja Protegida",
                 "loja-protegida", "contato@example.com", "Maria Silva", "Empresa Exemplo", null, null,
-                "INITIAL", "admin@example.com", "Ana Admin");
+                "INITIAL", "admin@example.com", "Ana Admin", null);
 
         mockMvc.perform(post("/internal/stores/provision")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -85,7 +102,7 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
 
         StoreProvisioningRequest changed = new StoreProvisioningRequest("hub-request-0002", "Outra Loja",
                 "outra-loja", "contato@example.com", "Maria Silva", "Empresa Exemplo", null, null,
-                "INITIAL", "admin@example.com", "Ana Admin");
+                "INITIAL", "admin@example.com", "Ana Admin", null);
         mockMvc.perform(post("/internal/stores/provision")
                         .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
                         .contentType(MediaType.APPLICATION_JSON)
