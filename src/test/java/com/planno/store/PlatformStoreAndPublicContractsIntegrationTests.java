@@ -84,6 +84,44 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
     }
 
     @Test
+    void hubCanUpdateStoreDomainOnlyWithProvisioningServiceToken() throws Exception {
+        StoreProvisioningRequest request = new StoreProvisioningRequest("hub-domain-update-001", "Loja Exemplo",
+                "loja-dominios", "contato@example.com", "Maria Silva", "Empresa Exemplo", null, null,
+                "INITIAL", "admin@example.com", "Ana Admin", "loja-dominios.planno.online");
+        String body = mockMvc.perform(post("/internal/stores/provision")
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String storeId = objectMapper.readTree(body).get("storeId").asText();
+
+        mockMvc.perform(put("/internal/stores/{storeId}/domain", storeId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"domain\":\"www.cliente.com.br\"}"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/internal/stores/{storeId}/domain", storeId)
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"domain\":\"www.cliente.com.br\"}"))
+                .andExpect(status().isNoContent());
+
+        org.assertj.core.api.Assertions.assertThat(storeRepository.findById(UUID.fromString(storeId)).orElseThrow().getPublicDomain())
+                .isEqualTo("www.cliente.com.br");
+    }
+
+    @Test
+    void publicStoreApiAllowsCustomHttpsStorefrontOriginsWithoutCredentials() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options("/api/v1/public/products")
+                        .header("Origin", "https://www.cliente.com.br")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Access-Control-Allow-Origin", "https://www.cliente.com.br"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Access-Control-Allow-Credentials", nullValue()));
+    }
+
+    @Test
     void hubProvisioningShouldRejectInvalidTokenAndIdempotencyKeyReuse() throws Exception {
         StoreProvisioningRequest request = new StoreProvisioningRequest("hub-request-0002", "Loja Protegida",
                 "loja-protegida", "contato@example.com", "Maria Silva", "Empresa Exemplo", null, null,

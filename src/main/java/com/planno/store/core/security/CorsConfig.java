@@ -29,7 +29,15 @@ public class CorsConfig {
         configuration.setExposedHeaders(List.of("X-Cart-Token", "Location"));
         configuration.setAllowCredentials(false);
 
+        CorsConfiguration storefront = new CorsConfiguration();
+        storefront.setAllowedOriginPatterns(List.of("*"));
+        storefront.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        storefront.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Store-Slug", "X-Cart-Token"));
+        storefront.setExposedHeaders(List.of("X-Cart-Token", "Location"));
+        storefront.setAllowCredentials(false);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/v1/public/**", storefront);
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }

@@ -52,6 +52,7 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.POST, "/internal/stores/provision").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/internal/stores/*/domain").permitAll()
                         .requestMatchers("/api/v1/public/**").permitAll()
                         .requestMatchers("/api/v1/auth/me").authenticated()
                         .requestMatchers("/api/v1/auth/**").permitAll()

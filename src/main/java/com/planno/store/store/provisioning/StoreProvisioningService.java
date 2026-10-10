@@ -67,6 +67,13 @@ public class StoreProvisioningService {
         return response(operation);
     }
 
+    @Transactional
+    public void updatePublicDomain(UUID storeId, String domain) {
+        Store store = stores.findById(storeId).orElseThrow(() -> new com.planno.store.core.exception.NotFoundException("Store not found"));
+        String normalized = domain.trim().toLowerCase(Locale.ROOT);
+        store.setPublicDomain(normalized);
+    }
+
     private StoreProvisioningResponse response(StoreProvisioningOperation operation) {
         return new StoreProvisioningResponse(operation.getId(), operation.getStoreId(), operation.getStatus(),
                 operation.getStoreId() == null ? null : stores.findById(operation.getStoreId()).map(Store::getPublicDomain).orElse(null));
