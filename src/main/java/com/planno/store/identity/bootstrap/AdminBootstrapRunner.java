@@ -51,11 +51,10 @@ public class AdminBootstrapRunner implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        ensureRoles();
         if (!properties.enabled()) {
             return;
         }
-
-        ensureRoles();
 
         if (properties.email() == null || properties.email().isBlank()
                 || properties.password() == null || properties.password().isBlank()) {

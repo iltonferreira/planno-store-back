@@ -50,6 +50,13 @@ public class StoreProvisioningController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{storeId}/admin-access")
+    public ResponseEntity<StoreProvisioningService.StoreAdminAccessResponse> issueAdminAccess(
+            HttpServletRequest httpRequest, @PathVariable java.util.UUID storeId) {
+        requireServiceToken(httpRequest);
+        return ResponseEntity.ok(service.issueAdminAccess(storeId));
+    }
+
     private void requireServiceToken(HttpServletRequest httpRequest) {
         String configuredToken = properties.serviceToken();
         if (configuredToken == null || configuredToken.length() < 32) {

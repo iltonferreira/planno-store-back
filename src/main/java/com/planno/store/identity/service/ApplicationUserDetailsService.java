@@ -49,6 +49,7 @@ public class ApplicationUserDetailsService implements UserDetailsService {
                 user.getEmail(),
                 user.getPasswordHash(),
                 user.getStatus() == UserStatus.ACTIVE,
+                user.mustChangePassword(),
                 storeIds,
                 authorities
         );

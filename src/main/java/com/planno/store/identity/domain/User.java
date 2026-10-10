@@ -27,6 +27,9 @@ public class User extends AuditableEntity {
     @Column(nullable = false, length = 50)
     private UserStatus status;
 
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword;
+
     protected User() {
     }
 
@@ -61,5 +64,18 @@ public class User extends AuditableEntity {
     public UserStatus getStatus() {
         return status;
     }
-}
 
+    public boolean mustChangePassword() { return mustChangePassword; }
+
+    public void setTemporaryPassword(String passwordHash) {
+        this.passwordHash = passwordHash;
+        this.mustChangePassword = true;
+    }
+
+    public void requirePasswordChange() { this.mustChangePassword = true; }
+
+    public void changePassword(String passwordHash) {
+        this.passwordHash = passwordHash;
+        this.mustChangePassword = false;
+    }
+}

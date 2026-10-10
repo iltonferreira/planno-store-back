@@ -10,7 +10,7 @@ public record AuthResponse(
         UUID userId,
         String email,
         List<String> roles,
-        List<UUID> storeIds
+        List<UUID> storeIds,
+        boolean mustChangePassword
 ) {
 }
-

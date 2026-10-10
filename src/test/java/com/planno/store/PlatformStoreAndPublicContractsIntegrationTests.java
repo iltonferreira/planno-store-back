@@ -70,6 +70,54 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
     }
 
     @Test
+    void provisionedStoreAdminMustSetPersonalPasswordBeforeUsingAdminApi() throws Exception {
+        StoreProvisioningRequest request = new StoreProvisioningRequest("hub-admin-access-0001", "Loja Aurora",
+                "loja-aurora", "contato@example.com", "Maria Silva", "Empresa Aurora", null, null,
+                "INITIAL", "admin@aurora.example.test", "Ana Admin", null);
+        String provisioned = mockMvc.perform(post("/internal/stores/provision")
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String storeId = objectMapper.readTree(provisioned).get("storeId").asText();
+
+        mockMvc.perform(post("/internal/stores/{storeId}/admin-access", storeId))
+                .andExpect(status().isUnauthorized());
+        String credentials = mockMvc.perform(post("/internal/stores/{storeId}/admin-access", storeId)
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("admin@aurora.example.test"))
+                .andExpect(jsonPath("$.temporaryPassword").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+        String temporaryPassword = objectMapper.readTree(credentials).get("temporaryPassword").asText();
+
+        String login = mockMvc.perform(post("/api/v1/auth/login").header(STORE_HEADER, "loja-aurora")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new com.planno.store.identity.dto.LoginRequest(
+                                "admin@aurora.example.test", temporaryPassword))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.mustChangePassword").value(true))
+                .andReturn().getResponse().getContentAsString();
+        String token = objectMapper.readTree(login).get("accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/admin/store/current").header(STORE_HEADER, "loja-aurora")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/auth/change-password").header(STORE_HEADER, "loja-aurora")
+                        .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"" + temporaryPassword + "\",\"newPassword\":\"Aurora-Owner-New-Password-2026!\"}"))
+                .andExpect(status().isNoContent());
+
+        String updatedLogin = mockMvc.perform(post("/api/v1/auth/login").header(STORE_HEADER, "loja-aurora")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"admin@aurora.example.test\",\"password\":\"Aurora-Owner-New-Password-2026!\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.mustChangePassword").value(false))
+                .andReturn().getResponse().getContentAsString();
+        String authenticated = objectMapper.readTree(updatedLogin).get("accessToken").asText();
+        mockMvc.perform(get("/api/v1/admin/store/current").header(STORE_HEADER, "loja-aurora")
+                        .header("Authorization", "Bearer " + authenticated))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void hubProvisioningCannotAssignAnUnreservedExternalDomain() throws Exception {
         StoreProvisioningRequest request = new StoreProvisioningRequest("hub-request-domain-1", "Loja Exemplo",
                 "loja-exemplo", "contato@example.com", "Maria Silva", "Empresa Exemplo", null, null,
