@@ -28,6 +28,20 @@ spring:
 server:
   shutdown: graceful
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+      show-details: never
+
 app:
   store-provisioning:
     service-token: ${APP_STORE_PROVISIONING_SERVICE_TOKEN:}

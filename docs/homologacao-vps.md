@@ -6,6 +6,7 @@ Esta configuração usa a mesma VPS Hostinger e o mesmo projeto PostgreSQL Supab
 
 - Vitrine: `https://<slug-da-loja>.planno.online` (por exemplo, `https://demo.planno.online`)
 - API: `https://api-store.planno.online`
+- Prontidão da API e conexão com o banco: `GET https://api-store.planno.online/actuator/health/readiness` (retorna somente `UP` ou `DOWN`)
 - Verificação da API: `GET /api/v1/public/store/current`
 
 O frontend é estático e pode ser publicado no Cloudflare Pages. A API Java roda em Docker na VPS. O HTTPS termina no Caddy. Nenhuma porta de banco de dados ou de aplicação é aberta para a internet.

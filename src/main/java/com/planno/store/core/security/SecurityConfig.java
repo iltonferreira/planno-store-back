@@ -51,6 +51,7 @@ public class SecurityConfig {
                         .accessDeniedHandler((request, response, accessDeniedException) -> response.sendError(403))
                 )
                 .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers(HttpMethod.POST, "/internal/stores/provision").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/internal/stores/*/domain").permitAll()
                         .requestMatchers("/api/v1/public/**").permitAll()

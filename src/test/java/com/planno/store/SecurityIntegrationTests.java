@@ -14,6 +14,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SecurityIntegrationTests extends AbstractIntegrationTest {
 
     @Test
+    void readinessProbeShouldBePublicAndCheckDatabaseAvailability() throws Exception {
+        mockMvc.perform(get("/actuator/health/readiness"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
+    }
+
+    @Test
     void publicRoutesShouldBeAccessibleAndProtectedRoutesShouldRespectRoles() throws Exception {
         Store store = createStore("store-a");
 
@@ -44,4 +51,3 @@ class SecurityIntegrationTests extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.slug").value("store-a"));
     }
 }
-
