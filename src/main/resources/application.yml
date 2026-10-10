@@ -15,8 +15,11 @@ spring:
         jdbc:
           time_zone: UTC
         format_sql: true
+        default_schema: ${DB_SCHEMA:public}
   flyway:
     enabled: true
+    schemas: ${DB_SCHEMA:public}
+    default-schema: ${DB_SCHEMA:public}
     locations: classpath:db/migration
   jackson:
     serialization:

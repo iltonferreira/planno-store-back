@@ -4,6 +4,7 @@ import com.planno.store.core.exception.BusinessException;
 import com.planno.store.media.config.SupabaseStorageProperties;
 import com.planno.store.media.dto.MediaUploadResponse;
 import com.planno.store.store.domain.Store;
+import com.planno.store.store.repository.StoreRepository;
 import java.io.IOException;
 import java.util.Set;
 import java.util.UUID;
@@ -23,10 +24,12 @@ public class StoreMediaService {
     private static final long MAX_FILE_SIZE = 5L * 1024L * 1024L;
 
     private final SupabaseStorageProperties properties;
+    private final StoreRepository storeRepository;
     private final RestClient restClient;
 
-    public StoreMediaService(SupabaseStorageProperties properties, RestClient.Builder restClientBuilder) {
+    public StoreMediaService(SupabaseStorageProperties properties, StoreRepository storeRepository, RestClient.Builder restClientBuilder) {
         this.properties = properties;
+        this.storeRepository = storeRepository;
         this.restClient = restClientBuilder.build();
     }
 
@@ -34,6 +37,7 @@ public class StoreMediaService {
     public MediaUploadResponse uploadLogo(Store store, MultipartFile file) {
         MediaUploadResponse uploaded = upload(store, "logo", file);
         store.updateBranding(uploaded.publicUrl(), store.getBannerUrl());
+        storeRepository.save(store);
         return uploaded;
     }
 
@@ -41,6 +45,7 @@ public class StoreMediaService {
     public MediaUploadResponse uploadBanner(Store store, MultipartFile file) {
         MediaUploadResponse uploaded = upload(store, "banner", file);
         store.updateBranding(store.getLogoUrl(), uploaded.publicUrl());
+        storeRepository.save(store);
         return uploaded;
     }
 

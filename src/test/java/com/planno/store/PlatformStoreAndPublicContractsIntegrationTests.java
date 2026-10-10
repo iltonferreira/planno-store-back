@@ -371,7 +371,7 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
-        return objectMapper.readTree(response).get("guestToken").asText();
+        return objectMapper.readTree(response).get("cartToken").asText();
     }
 
     private void addCartItem(String storeSlug, String cartToken, String productId, int quantity) throws Exception {
