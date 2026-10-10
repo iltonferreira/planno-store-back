@@ -24,10 +24,12 @@ Crie o arquivo `.env` no servidor ao lado do código da Store. Defina nele:
 | `APP_CORS_ALLOWED_ORIGINS` | `https://loja.planno.online` e, se necessário, a interface administrativa do Hub |
 | `APP_PAYMENT_MERCADO_PAGO_MOCK_ENABLED` | `true` em homologação; não processa pagamento real |
 | `APP_MEDIA_SUPABASE_MOCK_ENABLED` | `true` enquanto o Storage não estiver configurado |
-| `APP_BOOTSTRAP_STORE_*` | Nome, slug `loja-exemplo` e e-mail de contato da loja de demonstração |
-| `APP_BOOTSTRAP_ADMIN_*` | E-mail e senha únicos do administrador da loja |
+| `APP_BOOTSTRAP_STORE_ENABLED` | `false`; as lojas são criadas pela tela **Lojas** do Planno Hub |
+| `APP_BOOTSTRAP_ADMIN_ENABLED` | `false`; não criar uma loja ou conta de demonstração ao iniciar |
+| `APP_STORE_PROVISIONING_SERVICE_TOKEN` | Segredo compartilhado com o Hub para autorizar a criação de lojas |
+| `APP_STORE_PROVISIONING_DOMAIN_SUFFIX` | `planno.store`; domínio provisório mostrado após a criação |
 
-No primeiro início, a API aplica as migrations pelo Flyway e cria a loja e o administrador inicial. Depois que o primeiro acesso funcionar, desative `APP_BOOTSTRAP_ADMIN_ENABLED` e retire a senha inicial do arquivo. Restrinja o `.env` ao usuário administrador da VPS; nunca o envie ao GitHub ou ao frontend.
+No primeiro início, a API aplica as migrations pelo Flyway. O Hub chama a API interna para criar cada loja quando você usa **Lojas → Nova loja**. Guarde o mesmo token de integração nos dois arquivos `.env`. Restrinja os arquivos `.env` ao administrador da VPS; nunca os envie ao GitHub ou ao frontend.
 
 Não habilite pagamentos reais para testar a tela. Antes de ativar o Mercado Pago, use credenciais de teste, configure o webhook como `https://api-store.planno.online/api/v1/public/webhooks/mercado-pago` e teste o fluxo de ponta a ponta sem cobrar clientes.
 
