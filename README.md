@@ -323,12 +323,11 @@ Configuração de media com Supabase Storage:
 - `APP_MEDIA_SUPABASE_STORE_IMAGE_FOLDER` default `stores`
 - `APP_MEDIA_SUPABASE_MOCK_ENABLED` default `false`
 
-Deploy no Render:
+## Implantação na VPS Hostinger
 
-- O arquivo [render.yaml](/home/iltonferreira/dev/projetos/planno-store/planno-store-back/render.yaml:1) sobe apenas o backend.
-- O Blueprint usa `runtime: docker`, porque o schema atual do Render nao aceita `runtime: java`.
-- O [Dockerfile](/home/iltonferreira/dev/projetos/planno-store/planno-store-back/Dockerfile:1) empacota a app em Java 21 e publica na porta do Render via `server.port=$PORT`.
-- Para ambiente produtivo, use `SPRING_PROFILES_ACTIVE=prod`.
+O backend da Store roda em Docker na mesma VPS do Hub e usa um schema PostgreSQL separado no Supabase. O frontend de cada loja é publicado como um projeto Cloudflare Pages criado pela Hub, com um endereço provisório no formato `slug.planno.online`. O arquivo `render.yaml` e o checklist antigo do Render foram removidos para evitar que um deploy descontinuado seja iniciado por engano.
+
+Consulte o [guia de homologação na VPS](docs/homologacao-vps.md) para configuração, variáveis privadas, smoke tests e limitações conhecidas. A homologação mantém o pagamento da Store em modo simulado; isso não equivale à validação de pagamentos reais.
 
 ## Endpoints desta fase
 
