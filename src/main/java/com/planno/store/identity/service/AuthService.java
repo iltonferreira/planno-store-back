@@ -4,6 +4,7 @@ import com.planno.store.core.security.AuthenticatedUser;
 import com.planno.store.core.security.JwtProperties;
 import com.planno.store.core.security.JwtService;
 import com.planno.store.identity.dto.AuthResponse;
+import com.planno.store.identity.dto.ChangePasswordRequest;
 import com.planno.store.identity.dto.LoginRequest;
 import com.planno.store.identity.dto.MeResponse;
 import com.planno.store.identity.repository.UserRepository;
@@ -11,6 +12,7 @@ import java.util.Comparator;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,17 +23,20 @@ public class AuthService {
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public AuthService(
             AuthenticationManager authenticationManager,
             JwtService jwtService,
             JwtProperties jwtProperties,
-            UserRepository userRepository
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder
     ) {
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
         this.jwtProperties = jwtProperties;
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -42,6 +47,8 @@ public class AuthService {
         AuthenticatedUser user = (AuthenticatedUser) authentication.getPrincipal();
         String token = jwtService.generateToken(user);
 
+        var account = userRepository.findByEmailIgnoreCase(user.getUsername())
+                .orElseThrow(() -> new IllegalStateException("Authenticated user not found"));
         return new AuthResponse(
                 token,
                 "Bearer",
@@ -49,8 +56,25 @@ public class AuthService {
                 user.getUserId(),
                 user.getUsername(),
                 user.getAuthorities().stream().map(Object::toString).sorted().toList(),
-                user.getStoreIds().stream().sorted(Comparator.comparing(Object::toString)).toList()
+                user.getStoreIds().stream().sorted(Comparator.comparing(Object::toString)).toList(),
+                account.mustChangePassword()
         );
+    }
+
+    @Transactional
+    public void changePassword(ChangePasswordRequest request) {
+        AuthenticatedUser principal = (AuthenticatedUser) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        var account = userRepository.findByEmailIgnoreCase(principal.getUsername())
+                .orElseThrow(() -> new IllegalStateException("Authenticated user not found"));
+        if (!passwordEncoder.matches(request.currentPassword(), account.getPasswordHash())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNAUTHORIZED, "A senha atual está incorreta.");
+        }
+        if (request.currentPassword().equals(request.newPassword())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "Escolha uma senha diferente da atual.");
+        }
+        account.changePassword(passwordEncoder.encode(request.newPassword()));
     }
 
     @Transactional(readOnly = true)
@@ -69,4 +93,3 @@ public class AuthService {
         );
     }
 }
-

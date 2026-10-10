@@ -7,9 +7,11 @@ import com.planno.store.identity.domain.User;
 import com.planno.store.inventory.dto.InventoryUpdateRequest;
 import com.planno.store.order.dto.CreateOrderRequest;
 import com.planno.store.shipping.domain.ShippingMethodType;
+import com.planno.store.shipping.dto.AddressRequest;
 import com.planno.store.shipping.dto.ShippingMethodRequest;
 import com.planno.store.store.domain.Store;
 import com.planno.store.store.dto.PlatformStoreRequest;
+import com.planno.store.store.provisioning.StoreProvisioningRequest;
 import com.planno.store.support.AbstractIntegrationTest;
 import java.math.BigDecimal;
 import java.net.URI;
@@ -33,6 +35,166 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegrationTest {
 
     private static final String CART_HEADER = "X-Cart-Token";
+    private static final String PROVISIONING_TOKEN = "test-store-provisioning-token-with-at-least-32-chars";
+
+    @Test
+    void hubShouldProvisionStoreIdempotentlyWithServiceToken() throws Exception {
+        StoreProvisioningRequest request = new StoreProvisioningRequest("hub-request-0001", "Loja Exemplo",
+                "loja-exemplo", "contato@example.com", "Maria Silva", "Empresa Exemplo", "11999990000",
+                "12345678000190", "INITIAL", "admin@example.com", "Ana Admin", null);
+
+        String first = mockMvc.perform(post("/internal/stores/provision")
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("READY_FOR_CUSTOMIZATION"))
+                .andExpect(jsonPath("$.storeId").isNotEmpty())
+                .andExpect(jsonPath("$.operationId").isNotEmpty())
+                .andExpect(jsonPath("$.provisionalDomain").value("loja-exemplo.planno.test"))
+                .andReturn().getResponse().getContentAsString();
+
+        mockMvc.perform(post("/internal/stores/provision")
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.storeId").value(objectMapper.readTree(first).get("storeId").asText()))
+                .andExpect(jsonPath("$.operationId").value(objectMapper.readTree(first).get("operationId").asText()));
+
+        org.assertj.core.api.Assertions.assertThat(storeRepository.count()).isEqualTo(1);
+        org.assertj.core.api.Assertions.assertThat(storeProvisioningRepository.count()).isEqualTo(1);
+        java.util.UUID storeId = java.util.UUID.fromString(objectMapper.readTree(first).get("storeId").asText());
+        org.assertj.core.api.Assertions.assertThat(storeRepository.findById(storeId).orElseThrow().getPublicDomain())
+                .isEqualTo("loja-exemplo.planno.test");
+    }
+
+    @Test
+    void provisionedStoreAdminMustSetPersonalPasswordBeforeUsingAdminApi() throws Exception {
+        StoreProvisioningRequest request = new StoreProvisioningRequest("hub-admin-access-0001", "Loja Aurora",
+                "loja-aurora", "contato@example.com", "Maria Silva", "Empresa Aurora", null, null,
+                "INITIAL", "admin@aurora.example.test", "Ana Admin", null);
+        String provisioned = mockMvc.perform(post("/internal/stores/provision")
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String storeId = objectMapper.readTree(provisioned).get("storeId").asText();
+
+        mockMvc.perform(post("/internal/stores/{storeId}/admin-access", storeId))
+                .andExpect(status().isUnauthorized());
+        String credentials = mockMvc.perform(post("/internal/stores/{storeId}/admin-access", storeId)
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("admin@aurora.example.test"))
+                .andExpect(jsonPath("$.temporaryPassword").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+        String temporaryPassword = objectMapper.readTree(credentials).get("temporaryPassword").asText();
+
+        String login = mockMvc.perform(post("/api/v1/auth/login").header(STORE_HEADER, "loja-aurora")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new com.planno.store.identity.dto.LoginRequest(
+                                "admin@aurora.example.test", temporaryPassword))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.mustChangePassword").value(true))
+                .andReturn().getResponse().getContentAsString();
+        String token = objectMapper.readTree(login).get("accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/admin/store/current").header(STORE_HEADER, "loja-aurora")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/auth/change-password").header(STORE_HEADER, "loja-aurora")
+                        .header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"" + temporaryPassword + "\",\"newPassword\":\"Aurora-Owner-New-Password-2026!\"}"))
+                .andExpect(status().isNoContent());
+
+        String updatedLogin = mockMvc.perform(post("/api/v1/auth/login").header(STORE_HEADER, "loja-aurora")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"admin@aurora.example.test\",\"password\":\"Aurora-Owner-New-Password-2026!\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.mustChangePassword").value(false))
+                .andReturn().getResponse().getContentAsString();
+        String authenticated = objectMapper.readTree(updatedLogin).get("accessToken").asText();
+        mockMvc.perform(get("/api/v1/admin/store/current").header(STORE_HEADER, "loja-aurora")
+                        .header("Authorization", "Bearer " + authenticated))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void hubProvisioningCannotAssignAnUnreservedExternalDomain() throws Exception {
+        StoreProvisioningRequest request = new StoreProvisioningRequest("hub-request-domain-1", "Loja Exemplo",
+                "loja-exemplo", "contato@example.com", "Maria Silva", "Empresa Exemplo", null, null,
+                "INITIAL", "admin@example.com", "Ana Admin", "cliente.com.br");
+
+        mockMvc.perform(post("/internal/stores/provision")
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict());
+        org.assertj.core.api.Assertions.assertThat(storeRepository.count()).isZero();
+    }
+
+    @Test
+    void hubCanUpdateStoreDomainOnlyWithProvisioningServiceToken() throws Exception {
+        StoreProvisioningRequest request = new StoreProvisioningRequest("hub-domain-update-001", "Loja Exemplo",
+                "loja-dominios", "contato@example.com", "Maria Silva", "Empresa Exemplo", null, null,
+                "INITIAL", "admin@example.com", "Ana Admin", "loja-dominios.planno.online");
+        String body = mockMvc.perform(post("/internal/stores/provision")
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String storeId = objectMapper.readTree(body).get("storeId").asText();
+
+        mockMvc.perform(put("/internal/stores/{storeId}/domain", storeId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"domain\":\"www.cliente.com.br\"}"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(put("/internal/stores/{storeId}/domain", storeId)
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"domain\":\"www.cliente.com.br\"}"))
+                .andExpect(status().isNoContent());
+
+        org.assertj.core.api.Assertions.assertThat(storeRepository.findById(UUID.fromString(storeId)).orElseThrow().getPublicDomain())
+                .isEqualTo("www.cliente.com.br");
+    }
+
+    @Test
+    void publicStoreApiAllowsCustomHttpsStorefrontOriginsWithoutCredentials() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options("/api/v1/public/products")
+                        .header("Origin", "https://www.cliente.com.br")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Access-Control-Allow-Origin", "https://www.cliente.com.br"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string("Access-Control-Allow-Credentials", nullValue()));
+    }
+
+    @Test
+    void hubProvisioningShouldRejectInvalidTokenAndIdempotencyKeyReuse() throws Exception {
+        StoreProvisioningRequest request = new StoreProvisioningRequest("hub-request-0002", "Loja Protegida",
+                "loja-protegida", "contato@example.com", "Maria Silva", "Empresa Exemplo", null, null,
+                "INITIAL", "admin@example.com", "Ana Admin", null);
+
+        mockMvc.perform(post("/internal/stores/provision")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/internal/stores/provision")
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated());
+
+        StoreProvisioningRequest changed = new StoreProvisioningRequest("hub-request-0002", "Outra Loja",
+                "outra-loja", "contato@example.com", "Maria Silva", "Empresa Exemplo", null, null,
+                "INITIAL", "admin@example.com", "Ana Admin", null);
+        mockMvc.perform(post("/internal/stores/provision")
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(changed)))
+                .andExpect(status().isConflict());
+    }
 
     @Test
     void platformAdminShouldManageStoresAndCommission() throws Exception {
@@ -312,7 +474,7 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
-        return objectMapper.readTree(response).get("guestToken").asText();
+        return objectMapper.readTree(response).get("cartToken").asText();
     }
 
     private void addCartItem(String storeSlug, String cartToken, String productId, int quantity) throws Exception {
@@ -335,6 +497,11 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
                 .getResponse()
                 .getContentAsString();
         return UUID.fromString(objectMapper.readTree(response).get("id").asText());
+    }
+
+    private AddressRequest sampleAddress() {
+        return new AddressRequest("Cliente Teste", "Rua Principal", "100", "Apto 10", "Centro",
+                "Sao Paulo", "SP", "01001000", "BR");
     }
 
     private record Scenario(Store store, String adminToken, UUID orderId, String cartToken) {

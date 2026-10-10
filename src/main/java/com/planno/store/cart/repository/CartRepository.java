@@ -11,5 +11,5 @@ public interface CartRepository extends JpaRepository<Cart, UUID> {
 
     @EntityGraph(attributePaths = {"store", "items", "items.product"})
     Optional<Cart> findByStoreIdAndGuestTokenAndStatus(UUID storeId, String guestToken, CartStatus status);
-}
 
+}

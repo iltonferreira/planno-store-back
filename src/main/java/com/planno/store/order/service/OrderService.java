@@ -250,8 +250,8 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public StoreOrderResponse getPublic(UUID orderId) {
-        UUID activeCartId = cartService.getCurrentActiveCart().getId();
-        Order order = orderRepository.findByIdAndStoreIdAndCartId(orderId, currentStoreProvider.getCurrentStoreId(), activeCartId)
+        UUID guestCartId = cartService.getCurrentCheckedOutCart().getId();
+        Order order = orderRepository.findByIdAndStoreIdAndCartId(orderId, currentStoreProvider.getCurrentStoreId(), guestCartId)
                 .orElseThrow(() -> new NotFoundException("Order not found"));
         return toResponse(order);
     }

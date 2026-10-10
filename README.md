@@ -323,12 +323,11 @@ Configuração de media com Supabase Storage:
 - `APP_MEDIA_SUPABASE_STORE_IMAGE_FOLDER` default `stores`
 - `APP_MEDIA_SUPABASE_MOCK_ENABLED` default `false`
 
-Deploy no Render:
+## Implantação na VPS Hostinger
 
-- O arquivo [render.yaml](/home/iltonferreira/dev/projetos/planno-store/planno-store-back/render.yaml:1) sobe apenas o backend.
-- O Blueprint usa `runtime: docker`, porque o schema atual do Render nao aceita `runtime: java`.
-- O [Dockerfile](/home/iltonferreira/dev/projetos/planno-store/planno-store-back/Dockerfile:1) empacota a app em Java 21 e publica na porta do Render via `server.port=$PORT`.
-- Para ambiente produtivo, use `SPRING_PROFILES_ACTIVE=prod`.
+O backend da Store roda em Docker na mesma VPS do Hub e usa um schema PostgreSQL separado no Supabase. O frontend de cada loja é publicado como um projeto Cloudflare Pages criado pela Hub, com um endereço provisório no formato `slug.planno.online`. O arquivo `render.yaml` e o checklist antigo do Render foram removidos para evitar que um deploy descontinuado seja iniciado por engano.
+
+Consulte o [guia de homologação na VPS](docs/homologacao-vps.md) para configuração, variáveis privadas, smoke tests e limitações conhecidas. A homologação mantém o pagamento da Store em modo simulado; isso não equivale à validação de pagamentos reais.
 
 ## Endpoints desta fase
 
@@ -404,6 +403,7 @@ Protegidos:
 - `GET /api/v1/admin/payments/mercado-pago/account`
 - `GET /api/v1/admin/payments/mercado-pago/capabilities`
 - `POST /api/v1/admin/payments/mercado-pago/disconnect`
+- `POST /internal/stores/provision` (Hub, service token)
 - `GET /api/v1/admin/dashboard/summary`
 - `GET /api/v1/admin/dashboard/sales-by-day`
 - `GET /api/v1/admin/dashboard/top-products`
@@ -412,6 +412,8 @@ Protegidos:
 - `GET /api/v1/platform/dashboard/commission-by-store`
 - `GET /api/v1/platform/dashboard/sales-by-day`
 - `GET /api/v1/platform/dashboard/top-stores`
+
+O endpoint interno exige `X-Planno-Service-Token`, configurado por `APP_STORE_PROVISIONING_SERVICE_TOKEN` (mínimo 32 caracteres). Configure o mesmo segredo em `STORE_PROVISIONING_SERVICE_TOKEN` no Hub. `APP_STORE_PROVISIONING_DOMAIN_SUFFIX` define o domínio provisório (padrão `planno.store`). A requisição cria um registro de loja e uma operação idempotente; repetir a mesma chave e payload retorna os mesmos IDs. Chave reutilizada com payload diferente ou slug existente retorna `409 Conflict`. Os dados do administrador e o código de plano são registrados na operação; criação/ativação de usuário e cobrança ainda não fazem parte deste endpoint.
 
 ## Correções da base
 

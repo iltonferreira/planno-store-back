@@ -51,7 +51,12 @@ public class SecurityConfig {
                         .accessDeniedHandler((request, response, accessDeniedException) -> response.sendError(403))
                 )
                 .authorizeHttpRequests(authorize -> authorize
+                        .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/internal/stores/provision").permitAll()
+                        .requestMatchers(HttpMethod.PUT, "/internal/stores/*/domain").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/internal/stores/*/admin-access").permitAll()
                         .requestMatchers("/api/v1/public/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/auth/change-password").authenticated()
                         .requestMatchers("/api/v1/auth/me").authenticated()
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/platform/**").hasRole("PLATFORM_ADMIN")

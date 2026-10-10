@@ -96,6 +96,7 @@
 - `POST /api/v1/platform/stores`
 - `PUT /api/v1/platform/stores/{id}`
 - `DELETE /api/v1/platform/stores/{id}`
+- `POST /internal/stores/provision` (service-to-service; `X-Planno-Service-Token`)
 - `POST /api/v1/platform/stores/{storeId}/assets/logo`
 - `POST /api/v1/platform/stores/{storeId}/assets/banner`
 - `GET /api/v1/platform/payments`

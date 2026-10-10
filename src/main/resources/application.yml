@@ -15,8 +15,11 @@ spring:
         jdbc:
           time_zone: UTC
         format_sql: true
+        default_schema: ${DB_SCHEMA:public}
   flyway:
     enabled: true
+    schemas: ${DB_SCHEMA:public}
+    default-schema: ${DB_SCHEMA:public}
     locations: classpath:db/migration
   jackson:
     serialization:
@@ -25,7 +28,24 @@ spring:
 server:
   shutdown: graceful
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+      show-details: never
+
 app:
+  store-provisioning:
+    service-token: ${APP_STORE_PROVISIONING_SERVICE_TOKEN:}
+    domain-suffix: ${APP_STORE_PROVISIONING_DOMAIN_SUFFIX:planno.online}
   store-context:
     header-name: ${APP_STORE_CONTEXT_HEADER_NAME:X-Store-Slug}
   cart:
@@ -36,6 +56,7 @@ app:
       expiration-minutes: ${JWT_EXPIRATION_MINUTES:180}
     cors:
       allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost:4201,http://127.0.0.1:4200,http://127.0.0.1:4201}
+      allowed-origin-patterns: ${APP_CORS_ALLOWED_ORIGIN_PATTERNS:https://*.planno.online,https://*.pages.dev}
   payment:
     credentials-encryption-key-base64: ${APP_PAYMENT_CREDENTIALS_ENCRYPTION_KEY_BASE64:}
     oauth:

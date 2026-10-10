@@ -2,6 +2,7 @@ package com.planno.store.identity.controller;
 
 import com.planno.store.identity.dto.AuthResponse;
 import com.planno.store.identity.dto.LoginRequest;
+import com.planno.store.identity.dto.ChangePasswordRequest;
 import com.planno.store.identity.dto.MeResponse;
 import com.planno.store.identity.service.AuthService;
 import jakarta.validation.Valid;
@@ -31,5 +32,10 @@ public class AuthController {
     public ResponseEntity<MeResponse> me() {
         return ResponseEntity.ok(authService.me());
     }
-}
 
+    @PostMapping("/change-password")
+    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        authService.changePassword(request);
+        return ResponseEntity.noContent().build();
+    }
+}

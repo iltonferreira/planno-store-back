@@ -17,6 +17,9 @@ spring:
       mode: never
 
 app:
+  store-provisioning:
+    service-token: test-store-provisioning-token-with-at-least-32-chars
+    domain-suffix: planno.test
   payment:
     credentials-encryption-key-base64: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
     oauth:

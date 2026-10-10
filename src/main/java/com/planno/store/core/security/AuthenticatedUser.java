@@ -12,6 +12,7 @@ public class AuthenticatedUser implements UserDetails {
     private final String email;
     private final String password;
     private final boolean active;
+    private final boolean mustChangePassword;
     private final Set<UUID> storeIds;
     private final Collection<? extends GrantedAuthority> authorities;
 
@@ -20,6 +21,7 @@ public class AuthenticatedUser implements UserDetails {
             String email,
             String password,
             boolean active,
+            boolean mustChangePassword,
             Set<UUID> storeIds,
             Collection<? extends GrantedAuthority> authorities
     ) {
@@ -27,6 +29,7 @@ public class AuthenticatedUser implements UserDetails {
         this.email = email;
         this.password = password;
         this.active = active;
+        this.mustChangePassword = mustChangePassword;
         this.storeIds = storeIds;
         this.authorities = authorities;
     }
@@ -38,6 +41,8 @@ public class AuthenticatedUser implements UserDetails {
     public Set<UUID> getStoreIds() {
         return storeIds;
     }
+
+    public boolean mustChangePassword() { return mustChangePassword; }
 
     public boolean hasRole(String roleName) {
         return authorities.stream()

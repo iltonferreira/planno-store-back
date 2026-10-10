@@ -71,9 +71,17 @@ public class MercadoPagoPaymentProviderClient implements PaymentProviderClient {
         payload.put("marketplace_fee", payment.getCommissionAmount().setScale(2, RoundingMode.HALF_UP));
 
         Map<String, String> backUrls = new HashMap<>();
-        putIfPresent(backUrls, "success", paymentProperties.mercadoPago().successUrl());
-        putIfPresent(backUrls, "pending", paymentProperties.mercadoPago().pendingUrl());
-        putIfPresent(backUrls, "failure", paymentProperties.mercadoPago().failureUrl());
+        String storeDomain = payment.getStore().getPublicDomain();
+        if (StringUtils.hasText(storeDomain)) {
+            String returnUrl = "https://" + storeDomain + "/checkout/retorno";
+            backUrls.put("success", returnUrl + "?status=success");
+            backUrls.put("pending", returnUrl + "?status=pending");
+            backUrls.put("failure", returnUrl + "?status=failure");
+        } else {
+            putIfPresent(backUrls, "success", paymentProperties.mercadoPago().successUrl());
+            putIfPresent(backUrls, "pending", paymentProperties.mercadoPago().pendingUrl());
+            putIfPresent(backUrls, "failure", paymentProperties.mercadoPago().failureUrl());
+        }
         if (!backUrls.isEmpty()) {
             payload.put("back_urls", backUrls);
             payload.put("auto_return", "approved");

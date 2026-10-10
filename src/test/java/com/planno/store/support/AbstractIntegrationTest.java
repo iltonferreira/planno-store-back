@@ -30,6 +30,7 @@ import com.planno.store.shipping.repository.AddressRepository;
 import com.planno.store.shipping.repository.ShippingMethodRepository;
 import com.planno.store.store.domain.Store;
 import com.planno.store.store.repository.StoreRepository;
+import com.planno.store.store.provisioning.StoreProvisioningRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,6 +55,9 @@ public abstract class AbstractIntegrationTest {
 
     @Autowired
     protected StoreRepository storeRepository;
+
+    @Autowired
+    protected StoreProvisioningRepository storeProvisioningRepository;
 
     @Autowired
     protected RoleRepository roleRepository;
@@ -149,6 +153,7 @@ public abstract class AbstractIntegrationTest {
         assignmentRepository.deleteAllInBatch();
         userRepository.deleteAllInBatch();
         roleRepository.deleteAllInBatch();
+        storeProvisioningRepository.deleteAllInBatch();
         storeRepository.deleteAllInBatch();
     }
 
