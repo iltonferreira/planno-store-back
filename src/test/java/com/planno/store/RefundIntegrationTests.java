@@ -262,6 +262,7 @@ class RefundIntegrationTests extends AbstractIntegrationTest {
 
         UUID orderId = UUID.fromString(objectMapper.readTree(orderResponse).get("id").asText());
         String paymentResponse = mockMvc.perform(post("/api/v1/public/payments")
+                        .header(CART_HEADER, cartToken)
                         .header(STORE_HEADER, storeSlug)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CreatePaymentRequest(orderId))))

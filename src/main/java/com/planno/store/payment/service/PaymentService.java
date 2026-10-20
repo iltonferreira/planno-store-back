@@ -21,6 +21,8 @@ import com.planno.store.store.service.CurrentStoreProvider;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.time.Clock;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,35 +30,47 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PaymentService {
 
+    private final com.planno.store.core.auditing.FinancialLock locks;
+
     private final PaymentRepository paymentRepository;
     private final OrderService orderService;
     private final CurrentStoreProvider currentStoreProvider;
     private final PaymentProviderClient paymentProviderClient;
     private final PaymentProviderAccountService paymentProviderAccountService;
+    private final PaymentInitiationJournalService initiationJournal;
+    private final Clock reservationClock;
 
     public PaymentService(
             PaymentRepository paymentRepository,
             OrderService orderService,
             CurrentStoreProvider currentStoreProvider,
             PaymentProviderClient paymentProviderClient,
-            PaymentProviderAccountService paymentProviderAccountService
+            PaymentProviderAccountService paymentProviderAccountService ,
+            com.planno.store.core.auditing.FinancialLock locks,
+            PaymentInitiationJournalService initiationJournal,
+            @Qualifier("orderReservationClock") Clock reservationClock
     ) {
+        this.locks = locks;
         this.paymentRepository = paymentRepository;
         this.orderService = orderService;
         this.currentStoreProvider = currentStoreProvider;
         this.paymentProviderClient = paymentProviderClient;
         this.paymentProviderAccountService = paymentProviderAccountService;
+        this.initiationJournal = initiationJournal;
+        this.reservationClock = reservationClock;
     }
 
     @Transactional
     public PaymentInitiationResponse initiate(CreatePaymentRequest request) {
-        Order order = orderService.getOrderEntity(request.orderId());
+        Order order = locks.order(orderService.getPublicOrderEntity(request.orderId()));
         validateOrderForPayment(order);
         PaymentProviderAccount account = paymentProviderAccountService.requireConnectedAccountForCurrentStore();
         Payment payment = createPaymentAttempt(order, account, CheckoutType.PRO);
 
+        initiationJournal.register(order.getStore().getId(), order.getId(), payment.getId());
         PaymentCheckoutResult checkoutResult = paymentProviderClient.createCheckout(payment);
         payment.applyCheckoutResult(checkoutResult);
+        initiationJournal.resolve(order.getStore().getId(), order.getId(), payment.getId());
         return PaymentInitiationResponse.from(payment, checkoutResult.checkoutUrl());
     }
 
@@ -64,11 +78,12 @@ public class PaymentService {
     public TransparentPaymentResponse initiateTransparent(CreateTransparentPaymentRequest request) {
         validateTransparentRequest(request);
 
-        Order order = orderService.getOrderEntity(request.orderId());
+        Order order = locks.order(orderService.getPublicOrderEntity(request.orderId()));
         validateOrderForPayment(order);
         PaymentProviderAccount account = paymentProviderAccountService.requireTransparentReadyAccountForCurrentStore();
         Payment payment = createPaymentAttempt(order, account, CheckoutType.TRANSPARENT);
 
+        initiationJournal.register(order.getStore().getId(), order.getId(), payment.getId());
         PaymentCheckoutResult checkoutResult = paymentProviderClient.createTransparentPayment(
                 payment,
                 new TransparentPaymentProviderRequest(
@@ -94,6 +109,7 @@ public class PaymentService {
                 request.payerEmail().trim(),
                 checkoutResult.rawResponse()
         );
+        initiationJournal.resolve(order.getStore().getId(), order.getId(), payment.getId());
         return TransparentPaymentResponse.from(payment, transparentMessage(checkoutResult.status()), null);
     }
 
@@ -129,7 +145,10 @@ public class PaymentService {
                 .orElse(null);
     }
 
-    private static void validateOrderForPayment(Order order) {
+    private void validateOrderForPayment(Order order) {
+        if (initiationJournal.hasUnresolvedInitiation(order.getStore().getId(), order.getId())) {
+            throw new BusinessException(HttpStatus.CONFLICT, "A payment initiation requires reconciliation before retry");
+        }
         if (order.getStatus() == OrderStatus.CANCELLED) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "Cancelled orders cannot start payments");
         }
@@ -141,6 +160,13 @@ public class PaymentService {
         }
         if (order.getStatus() != OrderStatus.WAITING_PAYMENT) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "The order is not in a payable state");
+        }
+        if (order.getReservationExpiresAt() != null && !order.getReservationExpiresAt().toInstant().isAfter(reservationClock.instant())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "The order reservation has expired");
+        }
+        // Reject known local monetary errors before recording any possible external effect.
+        if (order.getTotalAmount().signum() <= 0 || order.getTotalAmount().stripTrailingZeros().scale() > 2) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Checkout amount must be positive and expressed in cents");
         }
     }
 

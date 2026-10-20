@@ -1,0 +1,1 @@
+Owned PostgreSQL stopped; temporary cluster deleted.

@@ -2,6 +2,7 @@ package com.planno.store.core.security;
 
 import java.util.Collection;
 import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -14,6 +15,7 @@ public class AuthenticatedUser implements UserDetails {
     private final boolean active;
     private final boolean mustChangePassword;
     private final Set<UUID> storeIds;
+    private final Map<UUID, Set<String>> storeRoles;
     private final Collection<? extends GrantedAuthority> authorities;
 
     public AuthenticatedUser(
@@ -23,6 +25,7 @@ public class AuthenticatedUser implements UserDetails {
             boolean active,
             boolean mustChangePassword,
             Set<UUID> storeIds,
+            Map<UUID, Set<String>> storeRoles,
             Collection<? extends GrantedAuthority> authorities
     ) {
         this.userId = userId;
@@ -30,7 +33,8 @@ public class AuthenticatedUser implements UserDetails {
         this.password = password;
         this.active = active;
         this.mustChangePassword = mustChangePassword;
-        this.storeIds = storeIds;
+        this.storeIds = Set.copyOf(storeIds);
+        this.storeRoles = Map.copyOf(storeRoles);
         this.authorities = authorities;
     }
 
@@ -48,6 +52,13 @@ public class AuthenticatedUser implements UserDetails {
         return authorities.stream()
                 .map(GrantedAuthority::getAuthority)
                 .anyMatch(authority -> authority.equals("ROLE_" + roleName));
+    }
+
+    public AuthenticatedUser forStore(UUID storeId) {
+        var scoped = authorities.stream().filter(authority ->
+                authority.getAuthority().equals("ROLE_PLATFORM_ADMIN")
+                || storeRoles.getOrDefault(storeId, Set.of()).contains(authority.getAuthority())).toList();
+        return new AuthenticatedUser(userId, email, password, active, mustChangePassword, storeIds, storeRoles, scoped);
     }
 
     public boolean canAccessStore(UUID storeId) {

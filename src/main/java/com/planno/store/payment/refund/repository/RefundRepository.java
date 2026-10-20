@@ -25,6 +25,15 @@ public interface RefundRepository extends JpaRepository<Refund, UUID> {
     Optional<Refund> findByProviderAndProviderRefundId(PaymentProvider provider, String providerRefundId);
 
     @EntityGraph(attributePaths = {"store", "payment", "order"})
+    Optional<Refund> findByProviderAndProviderRefundIdAndPaymentIdAndStoreIdAndProviderStateSummaryFalse(
+            PaymentProvider provider, String providerRefundId, UUID paymentId, UUID storeId);
+
+    @EntityGraph(attributePaths = {"store", "payment", "order"})
+    List<Refund> findAllByPaymentIdAndStoreIdAndProviderStateSummaryTrue(UUID paymentId, UUID storeId);
+
+    boolean existsByPaymentIdAndStoreIdAndInventoryRestoredTrue(UUID paymentId, UUID storeId);
+
+    @EntityGraph(attributePaths = {"store", "payment", "order"})
     Optional<Refund> findTopByPaymentIdAndStoreIdAndStatusInOrderByCreatedAtDesc(UUID paymentId, UUID storeId, Collection<RefundStatus> statuses);
 
     @Query("""

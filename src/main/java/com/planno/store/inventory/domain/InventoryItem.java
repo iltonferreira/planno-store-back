@@ -13,6 +13,11 @@ import jakarta.persistence.Table;
 @Table(name = "inventory_items")
 public class InventoryItem extends AuditableEntity {
 
+    @jakarta.persistence.Version
+    @jakarta.persistence.Column(nullable = false)
+    private long version;
+
+
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "product_id", nullable = false, unique = true)
     private Product product;

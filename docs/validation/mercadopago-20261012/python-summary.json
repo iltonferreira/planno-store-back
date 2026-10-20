@@ -1,0 +1,13 @@
+{
+  "oauth_tests": 54,
+  "preflight_tests": 18,
+  "total_tests": 72,
+  "failures": 0,
+  "errors": 0,
+  "classification": "LOCAL_UNIT_MOCKED_PROVIDER",
+  "local_https_smoke": "PASS",
+  "mercado_pago_http_requests_in_oauth_checks": 0,
+  "public_endpoint_created": false,
+  "skipped": 0,
+  "scope": "Local tests only; external OAuth observations are separate evidence files"
+}

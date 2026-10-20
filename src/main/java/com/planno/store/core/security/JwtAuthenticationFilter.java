@@ -19,10 +19,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    private final com.planno.store.store.service.CurrentStoreProvider stores;
 
-    public JwtAuthenticationFilter(JwtService jwtService, UserDetailsService userDetailsService) {
+    public JwtAuthenticationFilter(JwtService jwtService, UserDetailsService userDetailsService, com.planno.store.store.service.CurrentStoreProvider stores) {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
+        this.stores = stores;
     }
 
     @Override
@@ -57,9 +59,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     );
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authentication);
+                    if (request.getRequestURI().startsWith("/api/v1/admin/") && userDetails instanceof AuthenticatedUser principal) {
+                        var scoped = principal.forStore(stores.getCurrentStoreId());
+                        var scopedAuthentication = new UsernamePasswordAuthenticationToken(scoped, null, scoped.getAuthorities());
+                        scopedAuthentication.setDetails(authentication.getDetails());
+                        SecurityContextHolder.getContext().setAuthentication(scopedAuthentication);
+                    }
                 }
             }
-        } catch (JwtException ignored) {
+        } catch (org.springframework.security.access.AccessDeniedException denied) {
+            SecurityContextHolder.clearContext();
+            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+            return;
+        } catch (com.planno.store.core.exception.NotFoundException missing) {
+            SecurityContextHolder.clearContext();
+            response.sendError(HttpServletResponse.SC_NOT_FOUND);
+            return;
+        } catch (JwtException | org.springframework.security.core.userdetails.UsernameNotFoundException | IllegalArgumentException ignored) {
             SecurityContextHolder.clearContext();
         }
 

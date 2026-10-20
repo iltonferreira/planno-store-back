@@ -14,6 +14,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -35,6 +36,9 @@ public class Order extends AuditableEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private OrderStatus status;
+
+    @Column(name = "reservation_expires_at")
+    private OffsetDateTime reservationExpiresAt;
 
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal subtotalAmount;
@@ -193,6 +197,20 @@ public class Order extends AuditableEntity {
 
     public void updateStatus(OrderStatus status) {
         this.status = status;
+    }
+
+    public void initializeReservationExpiry(OffsetDateTime expiresAt) {
+        if (expiresAt == null) {
+            throw new IllegalArgumentException("Reservation expiry is required");
+        }
+        if (reservationExpiresAt != null) {
+            throw new IllegalStateException("Reservation expiry is already initialized");
+        }
+        reservationExpiresAt = expiresAt;
+    }
+
+    public OffsetDateTime getReservationExpiresAt() {
+        return reservationExpiresAt;
     }
 
     public Store getStore() {

@@ -17,6 +17,17 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(com.planno.store.identity.service.EmailFactorRequiredException.class)
+    public ResponseEntity<ApiErrorResponse> handleEmailFactorRequired(
+            com.planno.store.identity.service.EmailFactorRequiredException exception,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = HttpStatus.PRECONDITION_REQUIRED;
+        return ResponseEntity.status(status).body(new ApiErrorResponse(
+                OffsetDateTime.now(), status.value(), status.getReasonPhrase(), exception.getMessage(),
+                request.getRequestURI(), Map.of()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiErrorResponse> handleValidation(
             MethodArgumentNotValidException exception,
@@ -52,9 +63,9 @@ public class GlobalExceptionHandler {
         ));
     }
 
-    @ExceptionHandler(BadCredentialsException.class)
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
     public ResponseEntity<ApiErrorResponse> handleBadCredentials(
-            BadCredentialsException exception,
+            org.springframework.security.core.AuthenticationException exception,
             HttpServletRequest request
     ) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ApiErrorResponse(
@@ -95,6 +106,28 @@ public class GlobalExceptionHandler {
                 request.getRequestURI(),
                 Map.of()
         ));
+    }
+
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ResponseEntity<ApiErrorResponse> handleStatus(org.springframework.web.server.ResponseStatusException exception, HttpServletRequest request) {
+        var status = HttpStatus.valueOf(exception.getStatusCode().value());
+        return ResponseEntity.status(status).body(new ApiErrorResponse(OffsetDateTime.now(), status.value(),
+                status.getReasonPhrase(), status.is5xxServerError() ? "Unexpected internal error" : status.getReasonPhrase(),
+                request.getRequestURI(), Map.of()));
+    }
+
+    @ExceptionHandler({org.springframework.http.converter.HttpMessageNotReadableException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class})
+    public ResponseEntity<ApiErrorResponse> handleMalformedInput(Exception exception, HttpServletRequest request) {
+        return ResponseEntity.badRequest().body(new ApiErrorResponse(OffsetDateTime.now(), 400, "Bad Request",
+                "Invalid request", request.getRequestURI(), Map.of()));
+    }
+
+    @ExceptionHandler({org.springframework.dao.OptimisticLockingFailureException.class,
+            org.springframework.dao.PessimisticLockingFailureException.class})
+    public ResponseEntity<ApiErrorResponse> handleConcurrentUpdate(Exception exception, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ApiErrorResponse(OffsetDateTime.now(), 409, "Conflict",
+                "The resource changed concurrently; reload before retrying", request.getRequestURI(), Map.of()));
     }
 
     @ExceptionHandler(Exception.class)

@@ -38,7 +38,7 @@ Ainda não fazem parte desta fase:
 - Flyway
 - PostgreSQL
 - Maven
-- H2 apenas para testes automatizados
+- H2 em memória para testes padrão; PostgreSQL descartável no perfil opt-in `postgres-integration`
 
 ## Arquitetura inicial
 
@@ -522,8 +522,8 @@ O endpoint interno exige `X-Planno-Service-Token`, configurado por `APP_STORE_PR
 ## Fluxo de pagamento adotado
 
 1. o pedido nasce em `WAITING_PAYMENT`
-2. o frontend chama `POST /api/v1/public/payments` com o `orderId`
-3. `PaymentService` valida store, estado do pedido, valor derivado do pedido e se a store possui conta Mercado Pago conectada
+2. o frontend chama `POST /api/v1/public/payments` com o `orderId` e o header `X-Cart-Token` do carrinho que originou o pedido
+3. `PaymentService` valida propriedade do carrinho finalizado, store, estado e prazo do pedido, valor derivado do pedido e conta Mercado Pago conectada
 4. o backend cria um `Payment` local com snapshot financeiro do pedido e inicia um Checkout Pro no Mercado Pago usando a credencial da loja
 5. o retorno síncrono só confirma a criação da tentativa e devolve o `checkoutUrl`
 6. a confirmação real do pagamento acontece via webhook do Mercado Pago
@@ -533,11 +533,23 @@ O endpoint interno exige `X-Planno-Service-Token`, configurado por `APP_STORE_PR
 
 1. o pedido nasce em `WAITING_PAYMENT`
 2. o frontend usa a SDK do Mercado Pago para tokenizar os dados do cartão no navegador/app
-3. o frontend envia ao backend apenas o token e os dados mínimos do payer em `POST /api/v1/public/payments/transparent`
-4. o backend valida store, pedido, conta conectada e readiness para checkout transparente
+3. o frontend envia ao backend apenas o token do cartão e os dados mínimos do payer em `POST /api/v1/public/payments/transparent`, mantendo o header `X-Cart-Token` do carrinho original
+4. o backend valida propriedade do carrinho finalizado, store, pedido, prazo, conta conectada e readiness para checkout transparente
 5. o backend cria o pagamento real com a credencial OAuth da loja e com valor derivado exclusivamente de `Order.totalAmount`
 6. a comissão continua vindo do snapshot de `Order` e entra no provider como `application_fee`
 7. a confirmação operacional final continua vindo do webhook assinado
+
+## Autorização do checkout e validade das reservas
+
+- Pro e Transparente continuam disponíveis para compradores anônimos, sem exigir JWT. O token secreto do carrinho é uma capacidade de compra, distinta dos IDs públicos de pedido e carrinho: a consulta combina loja atual, carrinho `CHECKED_OUT`, token e associação do pedido. Conhecer o UUID do pedido, ter outro carrinho ou apresentar um JWT administrativo não autoriza essa operação pública. Trate o token como segredo do comprador; não o envie em URLs ou logs.
+- O contrato de criação/retorno dos pagamentos permanece; o header já usado no carrinho e na consulta pública de pedido passa a ser obrigatório nas duas iniciações. Ausência/valor vazio retorna 400; token ou associação inválidos retornam 404, sem iniciar pagamento. Os endpoints administrativos continuam usando seus controles próprios, sem exigir o token do comprador.
+- Cada pedido novo recebe um prazo fixo de 30 minutos calculado na criação. No prazo ou depois dele, pedidos `WAITING_PAYMENT` sem pagamento ou com apenas tentativas `REJECTED/CANCELLED/FAILED` podem expirar. `CREATED/PENDING/APPROVED`, estornos inconsistentes e resultados financeiros desconhecidos preservam a reserva. O prazo não autoriza cancelar um pagamento válido no provedor.
+- A rotina grava `CANCELLED` e histórico `RESERVATION_EXPIRATION`, libera reserva e uso do cupom na mesma transação, com lock do pedido. Repetição ou disputa com cancelamento/webhook não duplica liberação. Um cupom legitimamente excluído não possui contador a decrementar; um cupom existente de outra loja continua causando falha e rollback.
+- A rotina usa `app.order-reservation`: `ttl=PT30M`, `enabled=true`, `batch-size=100`, `fixed-delay=PT1M`. Os equivalentes de ambiente constam em `application.yml`. Alterar o TTL afeta somente pedidos novos; o prazo já gravado permanece. O scheduler está desabilitado no perfil `test`, onde seus caminhos são exercitados diretamente. A parada impede iniciar novos itens; a transação corrente pode terminar.
+- V27 adiciona prazo e journal durável. Pedidos legados sem prazo ficam fora da expiração automática, sem backfill. Devem ser conferidos antes de qualquer recuperação operacional de estoque.
+- Antes do POST ao provedor, após autorização e validações locais, o backend registra a iniciação em uma transação independente. O journal só é resolvido junto ao commit do `Payment`; timeout, resposta não compreendida ou rollback mantêm o resultado desconhecido e impedem expiração e nova tentativa. Não se presume falha financeira por ausência de `Payment` local. Status de pagamento nulo/desconhecido no adaptador retorna erro controlado, preservando o estado conhecido.
+- Essa proteção conservadora exige reconciliação operacional para journals não resolvidos; não há limpeza automática por idade nem implementação de cancelamento remoto. A transação independente exige uma conexão adicional do pool; dimensionamento, limites de espera e concorrência em PostgreSQL precisam de validação no ambiente de homologação.
+- Aprovação após expiração segue a política já autorizada: pagamento `APPROVED`, pedido `CANCELLED`, sem consumir estoque/reservas de terceiros, com reconciliação manual e sem estorno automático. Nenhuma regra de preço ou comissão foi alterada.
 
 ## Papel do frontend e do backend
 
@@ -555,6 +567,8 @@ O endpoint interno exige `X-Planno-Service-Token`, configurado por `APP_STORE_PR
 5. o backend valida o `state`, consome o registro e troca o código por tokens
 6. os tokens são criptografados e persistidos em `PaymentProviderAccount`
 7. a loja passa a aparecer como `CONNECTED` no painel admin
+
+O modo OAuth é definido no servidor por `APP_PAYMENT_MERCADO_PAGO_TEST_TOKEN` (default `false`); ele nunca vem do navegador. Para sandbox, use `true`: a resposta precisa conter access token `TEST-`; se Mercado Pago omitir `live_mode`, o tipo `TEST` continua sendo a evidência exigida pelo contrato publicado para sandbox. Para produção, mantenha `false`: somente são aceitos access token `APP_USR-` e `live_mode=true`. Resposta ausente, malformada ou incompatível é recusada antes de cifrar/persistir os tokens. A configuração não habilita pagamentos por si só; o ensaio real em sandbox continua obrigatório.
 
 ## Status da conta conectada
 
@@ -680,6 +694,7 @@ O endpoint interno exige `X-Planno-Service-Token`, configurado por `APP_STORE_PR
 
 - `Payment` representa a tentativa financeira do pedido.
 - O valor do pagamento sempre vem de `Order.totalAmount`.
+- No Checkout Pro, a preferência apresenta uma linha `Pedido <código>`, com quantidade 1 e preço igual ao total devido. O resumo informa subtotal, frete e desconto, sem dados pessoais; os produtos e suas quantidades permanecem detalhados no pedido. Essa composição evita omitir frete, duplicar descontos já presentes nos snapshots ou introduzir diferenças de arredondamento. Valores divergentes entre pedido e pagamento são rejeitados antes da chamada ao provedor.
 - Currency vem da store/pedido, nunca do frontend.
 - O pedido continua sendo a fonte oficial da compra.
 - O pagamento agora usa a credencial Mercado Pago da própria store.
@@ -714,6 +729,7 @@ O endpoint interno exige `X-Planno-Service-Token`, configurado por `APP_STORE_PR
 - Refund total aprovado devolve estoque ao inventário.
 - A reversão só acontece uma vez e é protegida por idempotência do fluxo.
 - Refund parcial não devolve estoque automaticamente nesta fase.
+- A devolução integral ocorre apenas na transição de pedido `PAID` para `REFUNDED`, sob o lock de pedido e pagamento, quando nenhum estorno desse pagamento e loja já registrou a devolução. Reentregas de qualquer estorno parcial não repetem a movimentação; a reconciliação pode reparar um status divergente sem devolver novamente o estoque.
 - A razão é manter uma política conservadora enquanto ainda não existe fluxo logístico detalhado por item.
 - Como a fase atual ainda não usa expedição/entrega operacional antes do refund, devolver estoque no refund total de um pedido `PAID` é uma regra segura neste estágio.
 
@@ -738,6 +754,8 @@ O endpoint interno exige `X-Planno-Service-Token`, configurado por `APP_STORE_PR
 - O webhook continua relevante para reconciliação e idempotência de eventos assíncronos.
 - Se um refund for confirmado novamente pelo webhook, o sistema não duplica efeitos.
 - Se o provedor enviar um refund externo já aprovado, o backend consegue reconciliar `Payment`, `Order` e `Refund`.
+- Quando o estado do pagamento confirma estorno total sem IDs individuais, um registro interno marcado como `providerStateSummary` representa somente o saldo confirmado ainda não atribuído. Eventos individuais posteriores absorvem esse saldo, preservando seus valores históricos e a soma do total estornado. O saldo pode chegar a zero e permanece auditável; não representa nova solicitação de estorno ao provedor. Sua reconciliação administrativa consulta o pagamento, sem enviar um ID de estorno inexistente.
+- A migration V26 adiciona essa marcação com valor inicial `false`; não identifica automaticamente registros financeiros históricos ambíguos. Estornos antigos aprovados sem ID externo e sem essa marcação exigem conferência controlada com o provedor antes de liberação, e o processamento falha com conflito em vez de inferir valores ou duplicar o total. Nenhum backfill ou reparo de dados reais foi executado nesta correção.
 
 ## Limitações atuais
 
@@ -763,6 +781,7 @@ O endpoint interno exige `X-Planno-Service-Token`, configurado por `APP_STORE_PR
 
 - Pedido criado: `WAITING_PAYMENT`
 - Webhook com pagamento aprovado: `WAITING_PAYMENT -> PAID`
+- Pagamento aprovado após cancelamento: o pagamento fica `APPROVED`, o pedido permanece `CANCELLED` e nenhuma reserva ou baixa de estoque é aplicada. O webhook e a reconciliação administrativa sinalizam a necessidade de reconciliação manual, inclusive em reentregas. Não há estorno automático; a elegibilidade de estorno administrativo continua exigindo pedido `PAID`. Essa política foi autorizada para esta correção.
 - O histórico do pedido registra a transição com fonte `PAYMENT_WEBHOOK`
 - Pagamento rejeitado/cancelado/falho não cancela automaticamente o pedido nesta fase
 - Nesses casos o pedido permanece em `WAITING_PAYMENT`, permitindo estratégia futura de nova tentativa
@@ -810,6 +829,26 @@ O endpoint interno exige `X-Planno-Service-Token`, configurado por `APP_STORE_PR
 6. área do cliente
 7. autorização por escopo mais rica
 8. resolução dinâmica de store por domínio
+
+## Validação local com PostgreSQL descartável
+
+O perfil Maven `postgres-integration` reutiliza os testes e mocks do perfil Spring `test`, mas substitui o H2 por um processo PostgreSQL real criado pela JVM de testes. Não recebe URL de banco existente e não possui fallback H2. Além das suítes padrão, executa `PostgresPersistenceIT`.
+
+Disponibilize uma distribuição portátil de PostgreSQL compatível com o sistema, contendo `postgres`, `initdb` e `pg_ctl`, sem instalar globalmente. A validação documentada usou PostgreSQL 17.8 do projeto `zonkyio/embedded-postgres-binaries`, obtido do Maven Central e conferido pelo SHA-256 publicado. Docker/Testcontainers são uma alternativa futura; o projeto não possui daemon Docker nem integração Testcontainers configurados nesta validação.
+
+```sh
+./mvnw -o -B -Ppostgres-integration \
+  -Dplanno.test.postgres.bin-dir=/caminho/privado/postgresql/bin \
+  clean verify
+```
+
+O teste cria diretório privado novo, credenciais temporárias e porta aleatória somente em `127.0.0.1`. O papel da aplicação não tem superuser, criação de bancos ou papéis; o banco descartável pertence a esse papel para permitir Flyway. Datasource, Flyway, schema e locations são fixados para o banco próprio antes do boot; datasource JNDI externo é rejeitado. Mercado Pago e Storage permanecem simulados, os bootstraps estão desativados e a rotina de reservas é exercitada diretamente. Nenhum volume existente é reutilizado.
+
+Cada limpeza de fixtures verifica o datasource. O shutdown para o processo e exclui somente seu cluster, preservando diagnósticos em `target/postgres-test-artifacts/`. Os XMLs ficam em `target/surefire-reports/`; confira também `cleanup.txt`. Se a execução for interrompida abruptamente, inspecione apenas o caminho de cluster registrado e seu processo antes de qualquer remoção. Processos e sockets locais precisam estar autorizados no ambiente de execução.
+
+O teste de upgrade aplica V1–V25, insere legados fictícios e aplica V26–V28. V27 mantém prazos legados nulos: a política de 30 minutos para novos pedidos não autoriza expiração retroativa. V28 exige um pedido por loja/carrinho e falha se houver duplicatas históricas para revisão manual; não remove nem consolida pedidos. Candidatos antigos precisam de reconciliação de provedor, pedidos, estoque e decisão comercial própria. O resultado local não valida pagamentos externos, webhooks remotos, pool sob carga nem a infraestrutura de produção.
+
+Resultados, correções e evidências estão no [relatório PostgreSQL](docs/postgresql-integration-validation.md).
 
 ## O que ainda não foi implementado
 

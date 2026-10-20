@@ -79,6 +79,9 @@ public class Refund extends AuditableEntity {
     @Column(name = "inventory_restored", nullable = false)
     private boolean inventoryRestored;
 
+    @Column(name = "provider_state_summary", nullable = false)
+    private boolean providerStateSummary;
+
     protected Refund() {
     }
 
@@ -91,8 +94,13 @@ public class Refund extends AuditableEntity {
             BigDecimal amount,
             String currency,
             String reason,
-            UUID requestedByUserId
+            UUID requestedByUserId,
+            boolean providerStateSummary
     ) {
+        if (amount == null || amount.signum() < 0 || (!providerStateSummary && amount.signum() == 0)
+                || (providerStateSummary && amount.compareTo(payment.getAmount()) > 0)) {
+            throw new IllegalArgumentException("Invalid refund amount");
+        }
         this.store = store;
         this.payment = payment;
         this.order = order;
@@ -105,6 +113,7 @@ public class Refund extends AuditableEntity {
         this.requestedByUserId = requestedByUserId;
         this.requestedAt = OffsetDateTime.now();
         this.inventoryRestored = false;
+        this.providerStateSummary = providerStateSummary;
     }
 
     public static Refund requested(
@@ -118,10 +127,36 @@ public class Refund extends AuditableEntity {
             String reason,
             UUID requestedByUserId
     ) {
-        return new Refund(store, payment, order, provider, type, amount, currency, reason, requestedByUserId);
+        return new Refund(store, payment, order, provider, type, amount, currency, reason, requestedByUserId, false);
+    }
+
+    public static Refund providerStateSummary(Payment payment, BigDecimal remainingAmount) {
+        Refund summary = new Refund(payment.getStore(), payment, payment.getOrder(), payment.getProvider(),
+                RefundType.FULL, remainingAmount, payment.getCurrency(),
+                "Cumulative full refund confirmed by provider", null, true);
+        summary.status = RefundStatus.APPROVED;
+        summary.processedAt = OffsetDateTime.now();
+        return summary;
+    }
+
+    public void rebalanceProviderStateSummary(BigDecimal remainingAmount) {
+        if (!providerStateSummary || remainingAmount == null || remainingAmount.signum() < 0
+                || remainingAmount.compareTo(payment.getAmount()) > 0) {
+            throw new IllegalStateException("Invalid provider refund summary update");
+        }
+        this.amount = remainingAmount.setScale(2, RoundingMode.HALF_UP);
     }
 
     public void updateProviderState(String providerRefundId, RefundStatus status, String rawResponse) {
+        if (providerStateSummary) {
+            throw new IllegalStateException("Provider refund summaries cannot receive individual refund events");
+        }
+        if (this.status == RefundStatus.APPROVED && status != RefundStatus.APPROVED) {
+            return;
+        }
+        if (this.providerRefundId != null && !this.providerRefundId.equals(blankToNull(providerRefundId))) {
+            throw new IllegalArgumentException("Refund provider identity cannot change");
+        }
         this.providerRefundId = blankToNull(providerRefundId);
         this.status = status;
         this.rawResponse = blankToNull(rawResponse);
@@ -188,6 +223,10 @@ public class Refund extends AuditableEntity {
 
     public boolean isInventoryRestored() {
         return inventoryRestored;
+    }
+
+    public boolean isProviderStateSummary() {
+        return providerStateSummary;
     }
 
     public void markInventoryRestored() {

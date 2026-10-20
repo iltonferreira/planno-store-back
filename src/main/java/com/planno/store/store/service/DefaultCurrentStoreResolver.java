@@ -48,6 +48,10 @@ public class DefaultCurrentStoreResolver implements CurrentStoreResolver {
             return new StoreContext(store.getId(), store.getSlug(), StoreContextSource.AUTHENTICATED_USER);
         }
 
+        if (authenticatedUser != null && authenticatedUser.getStoreIds().size() > 1) {
+            throw new AccessDeniedException("An authorized store context is required for this account");
+        }
+
         Store store = storeRepository.findFirstByStatusOrderByCreatedAtAsc(Store.StoreStatus.ACTIVE)
                 .orElseThrow(() -> new NotFoundException("No active store configured"));
         validateAccess(authenticatedUser, store.getId());
@@ -76,7 +80,7 @@ public class DefaultCurrentStoreResolver implements CurrentStoreResolver {
     }
 
     private void validateAccess(AuthenticatedUser authenticatedUser, UUID storeId) {
-        if (authenticatedUser == null || authenticatedUser.getStoreIds().isEmpty()) {
+        if (authenticatedUser == null) {
             return;
         }
         if (!authenticatedUser.canAccessStore(storeId)) {

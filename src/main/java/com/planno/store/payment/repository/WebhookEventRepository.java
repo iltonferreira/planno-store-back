@@ -26,9 +26,9 @@ public interface WebhookEventRepository extends JpaRepository<WebhookEvent, UUID
             where e.store.id = :storeId
             and (:provider is null or e.provider = :provider)
             and (:processed is null or e.processed = :processed)
-            and (:eventType is null or upper(e.eventType) = upper(:eventType))
-            and (:from is null or e.createdAt >= :from)
-            and (:to is null or e.createdAt <= :to)
+            and (:eventType is null or upper(e.eventType) = upper(cast(:eventType as string)))
+            and (cast(:from as OffsetDateTime) is null or e.createdAt >= :from)
+            and (cast(:to as OffsetDateTime) is null or e.createdAt <= :to)
             order by e.createdAt desc
             """)
     List<WebhookEvent> searchByStore(
@@ -47,7 +47,7 @@ public interface WebhookEventRepository extends JpaRepository<WebhookEvent, UUID
             where (:storeId is null or e.store.id = :storeId)
             and (:provider is null or e.provider = :provider)
             and (:processed is null or e.processed = :processed)
-            and (:eventType is null or upper(e.eventType) = upper(:eventType))
+            and (:eventType is null or upper(e.eventType) = upper(cast(:eventType as string)))
             order by e.createdAt desc
             """)
     List<WebhookEvent> searchPlatform(

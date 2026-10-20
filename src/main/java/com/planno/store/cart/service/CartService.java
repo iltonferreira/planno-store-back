@@ -159,6 +159,14 @@ public class CartService {
                 .orElseThrow(() -> new NotFoundException("Active cart not found for the current store"));
     }
 
+    @Transactional
+    public Cart getCurrentCartForCheckout(UUID cartId) {
+        UUID storeId = currentStoreProvider.getCurrentStoreId();
+        String token = cartTokenProvider.requireCurrentToken();
+        return cartRepository.findForCheckoutUpdate(cartId, storeId, token)
+                .orElseThrow(() -> new NotFoundException("Cart not found for the current store"));
+    }
+
     @Transactional(readOnly = true)
     public Cart getCurrentCheckedOutCart() {
         UUID storeId = currentStoreProvider.getCurrentStoreId();

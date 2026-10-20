@@ -24,7 +24,8 @@ public record PaymentProperties(
             String pendingUrl,
             String failureUrl,
             String apiBaseUrl,
-            String authBaseUrl
+            String authBaseUrl,
+            boolean testToken
     ) {
     }
 }

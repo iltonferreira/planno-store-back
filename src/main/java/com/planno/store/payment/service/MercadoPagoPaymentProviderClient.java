@@ -2,6 +2,7 @@ package com.planno.store.payment.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.planno.store.core.exception.BusinessException;
 import com.planno.store.payment.account.domain.PaymentProviderAccount;
 import com.planno.store.payment.account.service.PaymentProviderAccountService;
@@ -50,16 +51,29 @@ public class MercadoPagoPaymentProviderClient implements PaymentProviderClient {
 
     @Override
     public PaymentCheckoutResult createCheckout(Payment payment) {
+        BigDecimal amount = payment.getAmount();
+        if (amount.compareTo(payment.getOrder().getTotalAmount()) != 0) {
+            throw new BusinessException(HttpStatus.CONFLICT, "Payment amount does not match the order total");
+        }
+        if (amount.signum() <= 0 || amount.stripTrailingZeros().scale() > 2) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Checkout amount must be positive and expressed in cents");
+        }
         PaymentProviderAccount account = paymentProviderAccountService.requireConnectedAccountForCurrentStore();
         String sellerAccessToken = paymentProviderAccountService.decryptAccessToken(account);
         Map<String, Object> payload = new HashMap<>();
-        payload.put("items", payment.getOrder().getItems().stream().map(item -> Map.of(
-                "id", item.getProduct().getId().toString(),
-                "title", item.getProductNameSnapshot(),
-                "quantity", item.getQuantity(),
+        // Charge one explicit order line: item snapshots already include promotions and can
+        // differ from quantity * rounded unit price. The financial snapshot includes all adjustments.
+        payload.put("items", List.of(Map.of(
+                "id", payment.getOrder().getId().toString(),
+                "title", "Pedido " + payment.getOrder().getCode(),
+                "description", "Total do pedido: " + payment.getCurrency() + " " + amount.toPlainString()
+                        + " (subtotal: " + payment.getOrder().getSubtotalAmount().toPlainString()
+                        + "; frete: " + payment.getOrder().getShippingAmount().toPlainString()
+                        + "; descontos: " + payment.getOrder().getDiscountAmount().toPlainString() + ")",
+                "quantity", 1,
                 "currency_id", payment.getCurrency(),
-                "unit_price", item.getUnitPriceSnapshot().setScale(2, RoundingMode.HALF_UP)
-        )).toList());
+                "unit_price", amount.setScale(2, RoundingMode.UNNECESSARY)
+        )));
         payload.put("external_reference", payment.getOrder().getCode());
         payload.put("notification_url", paymentProperties.mercadoPago().webhookUrl());
         payload.put("metadata", Map.of(
@@ -96,7 +110,7 @@ public class MercadoPagoPaymentProviderClient implements PaymentProviderClient {
                     .retrieve()
                     .body(String.class);
 
-            JsonNode response = objectMapper.readTree(rawResponse);
+            JsonNode response = readProviderResponse(rawResponse);
             return new PaymentCheckoutResult(
                     null,
                     textOrNull(response, "id"),
@@ -146,7 +160,7 @@ public class MercadoPagoPaymentProviderClient implements PaymentProviderClient {
                     .retrieve()
                     .body(String.class);
 
-            JsonNode response = objectMapper.readTree(rawResponse);
+            JsonNode response = readProviderResponse(rawResponse);
             return new PaymentCheckoutResult(
                     textOrNull(response, "id"),
                     null,
@@ -172,15 +186,15 @@ public class MercadoPagoPaymentProviderClient implements PaymentProviderClient {
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + sellerAccessToken)
                     .retrieve()
                     .body(String.class);
-            JsonNode response = objectMapper.readTree(rawResponse);
+            JsonNode response = readProviderResponse(rawResponse);
             JsonNode metadata = response.path("metadata");
             return new PaymentProviderPaymentDetails(
                     textOrNull(response, "id"),
                     firstNonBlank(textOrNull(metadata, "preference_id"), textOrNull(response.path("point_of_interaction").path("transaction_data"), "qr_code_base64")),
-                    firstNonBlank(textOrNull(response, "user_id"), textOrNull(metadata, "provider_user_id")),
+                    firstNonBlank(textOrNull(response, "collector_id"), textOrNull(response, "user_id"), textOrNull(metadata, "provider_user_id")),
                     mapMercadoPagoStatus(textOrNull(response, "status")),
                     textOrNull(response, "status_detail"),
-                    decimalOrZero(response, "transaction_amount"),
+                    requiredDecimal(response, "transaction_amount"),
                     firstNonBlank(textOrNull(response, "currency_id"), "BRL"),
                     textOrNull(response, "payment_method_id"),
                     firstNonBlank(textOrNull(metadata, "internal_payment_id"), textOrNull(response, "external_reference"))
@@ -211,12 +225,12 @@ public class MercadoPagoPaymentProviderClient implements PaymentProviderClient {
                     .retrieve()
                     .body(String.class);
 
-            JsonNode response = objectMapper.readTree(rawResponse);
+            JsonNode response = readProviderResponse(rawResponse);
             return new PaymentProviderRefundDetails(
                     textOrNull(response, "id"),
                     firstNonBlank(textOrNull(response, "payment_id"), refund.getPayment().getProviderPaymentId()),
                     mapMercadoPagoRefundStatus(textOrNull(response, "status")),
-                    decimalOrZero(response, "amount"),
+                    requiredDecimal(response, "amount"),
                     firstNonBlank(textOrNull(response, "currency_id"), refund.getCurrency()),
                     rawResponse
             );
@@ -227,19 +241,27 @@ public class MercadoPagoPaymentProviderClient implements PaymentProviderClient {
 
     @Override
     public PaymentProviderRefundDetails getRefundDetails(PaymentProviderAccount account, String externalRefundId) {
+        throw new BusinessException(HttpStatus.CONFLICT, "Payment identifier is required to query a Mercado Pago refund");
+    }
+
+    @Override
+    public PaymentProviderRefundDetails getRefundDetails(PaymentProviderAccount account, String externalPaymentId, String externalRefundId) {
+        if (!StringUtils.hasText(externalPaymentId) || !StringUtils.hasText(externalRefundId)) {
+            throw new BusinessException(HttpStatus.CONFLICT, "Payment and refund identifiers are required for reconciliation");
+        }
         String sellerAccessToken = paymentProviderAccountService.decryptAccessToken(account);
         try {
             String rawResponse = restClient.get()
-                    .uri("/v1/refunds/{id}", externalRefundId)
+                    .uri("/v1/payments/{paymentId}/refunds/{refundId}", externalPaymentId, externalRefundId)
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + sellerAccessToken)
                     .retrieve()
                     .body(String.class);
-            JsonNode response = objectMapper.readTree(rawResponse);
+            JsonNode response = readProviderResponse(rawResponse);
             return new PaymentProviderRefundDetails(
                     textOrNull(response, "id"),
                     textOrNull(response, "payment_id"),
                     mapMercadoPagoRefundStatus(textOrNull(response, "status")),
-                    decimalOrZero(response, "amount"),
+                    requiredDecimal(response, "amount"),
                     firstNonBlank(textOrNull(response, "currency_id"), "BRL"),
                     rawResponse
             );
@@ -250,9 +272,14 @@ public class MercadoPagoPaymentProviderClient implements PaymentProviderClient {
         }
     }
 
+    private JsonNode readProviderResponse(String rawResponse) throws java.io.IOException {
+        // Preserve decimal literals before validating cents; a DoubleNode could erase subcent digits.
+        return objectMapper.reader().with(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS).readTree(rawResponse);
+    }
+
     private static PaymentStatus mapMercadoPagoStatus(String status) {
         if (status == null) {
-            return PaymentStatus.FAILED;
+            throw new BusinessException(HttpStatus.BAD_GATEWAY, "Mercado Pago payment status is missing");
         }
         return switch (status.toLowerCase()) {
             case "approved" -> PaymentStatus.APPROVED;
@@ -260,7 +287,7 @@ public class MercadoPagoPaymentProviderClient implements PaymentProviderClient {
             case "rejected" -> PaymentStatus.REJECTED;
             case "cancelled" -> PaymentStatus.CANCELLED;
             case "refunded", "charged_back" -> PaymentStatus.REFUNDED;
-            default -> PaymentStatus.FAILED;
+            default -> throw new BusinessException(HttpStatus.BAD_GATEWAY, "Mercado Pago payment status is unsupported");
         };
     }
 
@@ -277,11 +304,23 @@ public class MercadoPagoPaymentProviderClient implements PaymentProviderClient {
         };
     }
 
-    private static BigDecimal decimalOrZero(JsonNode node, String field) {
-        if (!node.hasNonNull(field)) {
-            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    private static BigDecimal requiredDecimal(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        if (value == null || value.isNull() || (!value.isNumber() && !value.isTextual())) {
+            throw new BusinessException(HttpStatus.BAD_GATEWAY, "Mercado Pago monetary field is missing or invalid");
         }
-        return node.get(field).decimalValue().setScale(2, RoundingMode.HALF_UP);
+        if (value.isTextual() && !value.asText().matches("[0-9]+(?:\\.[0-9]+)?")) {
+            throw new BusinessException(HttpStatus.BAD_GATEWAY, "Mercado Pago monetary field is invalid");
+        }
+        try {
+            BigDecimal amount = value.isNumber() ? value.decimalValue() : new BigDecimal(value.asText());
+            if (amount.signum() < 0) {
+                throw new ArithmeticException("Negative monetary field");
+            }
+            return amount.setScale(2, RoundingMode.UNNECESSARY);
+        } catch (NumberFormatException | ArithmeticException exception) {
+            throw new BusinessException(HttpStatus.BAD_GATEWAY, "Mercado Pago monetary field is invalid");
+        }
     }
 
     private static void putIfPresent(Map<String, String> target, String key, String value) {

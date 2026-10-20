@@ -15,4 +15,8 @@ public interface PaymentProviderClient {
     PaymentProviderRefundDetails createRefund(Refund refund);
 
     PaymentProviderRefundDetails getRefundDetails(PaymentProviderAccount account, String externalRefundId);
+
+    default PaymentProviderRefundDetails getRefundDetails(PaymentProviderAccount account, String externalPaymentId, String externalRefundId) {
+        return getRefundDetails(account, externalRefundId);
+    }
 }

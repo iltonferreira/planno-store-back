@@ -1,0 +1,23 @@
+{
+  "operation": "oauth_test_code_exchange",
+  "test_token_true": true,
+  "host": "api.mercadopago.com",
+  "method": "POST",
+  "payment_requests": 0,
+  "raw_response_saved": false,
+  "token_saved": false,
+  "http_status": 200,
+  "body_sha256": "102ba97ead2d7d8ebcbcaed6729716fd1edda12e3392224540fcc4ea247a47ef",
+  "result": "response_contract_rejected",
+  "timestamp_utc": "2026-10-12T16:22:10.559387+00:00",
+  "session_consumed": true,
+  "validated_token_file_exists": false,
+  "tunnel_stopped": true,
+  "tunnel_elapsed_seconds": 350.16,
+  "redirect_restored_reported_by_user": true,
+  "redirect_restored_independently_verified": false,
+  "browser_callback_status": 502,
+  "invalid_callback_probe_http_status": 400,
+  "test_grant_authorized": true,
+  "rejection_reason_unavailable": true
+}

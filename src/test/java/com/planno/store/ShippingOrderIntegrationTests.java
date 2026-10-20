@@ -160,6 +160,57 @@ class ShippingOrderIntegrationTests extends AbstractIntegrationTest {
     }
 
     @Test
+    void retryingSameCheckoutRecoversOrderButDifferentDetailsConflict() throws Exception {
+        Store store = createStore("store-a");
+        User admin = createUser("admin@example.com", "password123");
+        assignRole(admin, RoleName.ADMIN, store);
+        String adminToken = tokenFor(admin.getEmail());
+
+        String shippingMethodId = createShippingMethod(adminToken, "store-a", "Entrega", "8.00", 3, true);
+        String productId = createProduct(adminToken, "store-a", "produto-retry", "SKU-RETRY", ProductStatus.ACTIVE, "25.00");
+        updateInventory(adminToken, "store-a", productId, 5, 0);
+        String cartToken = createCart("store-a");
+        addCartItem("store-a", cartToken, productId, 2);
+        UUID cartId = currentCartId("store-a", cartToken);
+        CreateOrderRequest request = new CreateOrderRequest(cartId, UUID.fromString(shippingMethodId),
+                "Cliente Retry", "retry@example.com", null, sampleAddress());
+        String body = objectMapper.writeValueAsString(request);
+
+        String original = mockMvc.perform(post("/api/v1/public/orders")
+                        .header(STORE_HEADER, "store-a")
+                        .header(CART_HEADER, cartToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String originalId = objectMapper.readTree(original).get("id").asText();
+
+        mockMvc.perform(post("/api/v1/public/orders")
+                        .header(STORE_HEADER, "store-a")
+                        .header(CART_HEADER, cartToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(originalId));
+
+        mockMvc.perform(post("/api/v1/public/orders")
+                        .header(STORE_HEADER, "store-a")
+                        .header(CART_HEADER, cartToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateOrderRequest(cartId,
+                                UUID.fromString(shippingMethodId), "Outro Cliente", "retry@example.com", null, sampleAddress()))))
+                .andExpect(status().isConflict());
+
+        mockMvc.perform(get("/api/v1/admin/orders")
+                        .header(STORE_HEADER, "store-a")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)));
+        var inventory = inventoryItemRepository.findByProductIdAndProductStoreId(UUID.fromString(productId), store.getId()).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals(2, inventory.getQuantityReserved());
+    }
+
+    @Test
     void orderCreationShouldFailForInvalidCheckoutConditionsAndInvalidTransitions() throws Exception {
         Store store = createStore("store-a");
         User admin = createUser("admin@example.com", "password123");

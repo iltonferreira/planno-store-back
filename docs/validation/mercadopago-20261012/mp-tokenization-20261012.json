@@ -1,0 +1,41 @@
+{
+  "timestamp_utc": "2026-10-12T11:17:48.018526+00:00",
+  "classification": "REAL_HTTP_TEST_CREDENTIALS_TOKENIZATION_ONLY",
+  "host": "api.mercadopago.com",
+  "credentials_prefix_checked": "TEST",
+  "mutating_requests": 1,
+  "payment_requests": 0,
+  "raw_responses_saved": false,
+  "observations": [
+    {
+      "operation": "payment_methods",
+      "method": "GET",
+      "http_status": 200,
+      "body_sha256": "75e1fad19217a61ce65bf7ca06fef41259222d14222b6c8fba97f42adece1899",
+      "json_response": true,
+      "payment_method_count": 20,
+      "visa_present": true
+    },
+    {
+      "operation": "search_synthetic_reference",
+      "method": "GET",
+      "http_status": 200,
+      "body_sha256": "47c1cdbcaffb6d2e8b50124412f4f7cc3728a05bb956295be7345a55f29607d6",
+      "json_response": true,
+      "result_count": 0,
+      "synthetic_reference_only": true
+    },
+    {
+      "operation": "tokenize_official_test_card",
+      "method": "POST",
+      "http_status": 201,
+      "body_sha256": "fecbbbbe0efedf46c06c7e7410b518ab141e569300beac2b37d3dfef3d339dde",
+      "json_response": true,
+      "token_id_present": true,
+      "live_mode_false": true,
+      "luhn_validation_true": true,
+      "status_active": true,
+      "token_saved_or_used": false
+    }
+  ]
+}

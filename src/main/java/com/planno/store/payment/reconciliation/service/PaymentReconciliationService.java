@@ -3,6 +3,8 @@ package com.planno.store.payment.reconciliation.service;
 import com.planno.store.payment.account.domain.PaymentProviderAccount;
 import com.planno.store.payment.account.service.PaymentProviderAccountService;
 import com.planno.store.payment.domain.Payment;
+import com.planno.store.payment.domain.PaymentStatus;
+import com.planno.store.order.domain.OrderStatus;
 import com.planno.store.payment.reconciliation.dto.ReconciliationResultResponse;
 import com.planno.store.payment.refund.domain.Refund;
 import com.planno.store.payment.refund.service.RefundService;
@@ -51,8 +53,9 @@ public class PaymentReconciliationService {
         String after = payment.getStatus().name() + ":" + payment.getOrder().getStatus().name();
         boolean changed = !before.equals(after);
 
-        if (providerPayment.status().name().contains("REFUNDED")) {
-            refundService.reconcilePaymentRefundState(payment, null, payment.getAmount(), "Refund confirmed by payment reconciliation");
+        if (payment.getStatus() == PaymentStatus.APPROVED && payment.getOrder().getStatus() == OrderStatus.CANCELLED) {
+            return ReconciliationResultResponse.of("PAYMENT", payment.getId().toString(), changed,
+                    "Late payment approved for cancelled order; manual reconciliation required; inventory unchanged");
         }
 
         return ReconciliationResultResponse.of("PAYMENT", payment.getId().toString(), changed, changed
@@ -63,8 +66,14 @@ public class PaymentReconciliationService {
     @Transactional
     public ReconciliationResultResponse reconcileRefund(UUID refundId) {
         Refund refund = refundService.getRefundEntity(refundId);
+        if (refund.isProviderStateSummary()) {
+            ReconciliationResultResponse result = reconcilePayment(refund.getPayment().getId());
+            return ReconciliationResultResponse.of("REFUND", refund.getId().toString(), result.changed(),
+                    "Cumulative refund balance reconciled through payment: " + result.result());
+        }
         PaymentProviderAccount account = paymentProviderAccountService.requireConnectedAccountForStore(refund.getStore().getId());
-        PaymentProviderRefundDetails providerRefund = paymentProviderClient.getRefundDetails(account, refund.getProviderRefundId());
+        PaymentProviderRefundDetails providerRefund = paymentProviderClient.getRefundDetails(account,
+                refund.getPayment().getProviderPaymentId(), refund.getProviderRefundId());
         String before = refund.getStatus().name() + ":" + refund.getPayment().getStatus().name() + ":" + refund.getOrder().getStatus().name();
         refundService.reconcileProviderRefund(refund.getProvider(), providerRefund, "Refund reconciled manually");
         String after = refund.getStatus().name() + ":" + refund.getPayment().getStatus().name() + ":" + refund.getOrder().getStatus().name();

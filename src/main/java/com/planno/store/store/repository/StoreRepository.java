@@ -28,9 +28,9 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
             where (:status is null or s.status = :status)
             and (
                 :search is null
-                or upper(s.name) like upper(concat('%', :search, '%'))
-                or upper(s.slug) like upper(concat('%', :search, '%'))
-                or upper(s.contactEmail) like upper(concat('%', :search, '%'))
+                or upper(s.name) like upper(concat('%', cast(:search as string), '%'))
+                or upper(s.slug) like upper(concat('%', cast(:search as string), '%'))
+                or upper(s.contactEmail) like upper(concat('%', cast(:search as string), '%'))
             )
             order by s.createdAt asc
             """)

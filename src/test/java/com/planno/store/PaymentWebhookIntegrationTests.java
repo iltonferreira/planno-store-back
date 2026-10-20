@@ -43,6 +43,83 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class PaymentWebhookIntegrationTests extends AbstractIntegrationTest {
 
+    @Autowired private com.planno.store.payment.service.WebhookService webhookService;
+
+    @Test
+    void reconciliationRejectsAmountCurrencyAndMerchantMismatchBeforeMutation() throws Exception {
+        Scenario scenario = createScenario("payment-validation", "payment-validation@example.com", "validation-product", "SKU-VAL", "40.00", "12.90", 1, 8);
+        connectMercadoPagoAccount("payment-validation", scenario.adminToken(), "oauth-validation");
+        String response = mockMvc.perform(post("/api/v1/public/payments")
+                        .header(CART_HEADER, scenario.cartToken())
+                .header(STORE_HEADER, "payment-validation").contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(new CreatePaymentRequest(scenario.orderId()))))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        var payment = paymentRepository.findById(UUID.fromString(objectMapper.readTree(response).get("paymentId").asText())).orElseThrow();
+        var initialStatus = payment.getStatus();
+        var valid = new com.planno.store.payment.service.PaymentProviderPaymentDetails("external", "checkout", payment.getProviderMerchantId(),
+                com.planno.store.payment.domain.PaymentStatus.APPROVED, "approved", payment.getAmount(), payment.getCurrency(), "card", payment.getId().toString());
+        var wrongAmount = new com.planno.store.payment.service.PaymentProviderPaymentDetails(valid.providerPaymentId(), valid.providerCheckoutId(),
+                valid.providerMerchantId(), valid.status(), valid.statusDetail(), java.math.BigDecimal.ONE, valid.currency(), valid.paymentMethod(), valid.externalReference());
+        var wrongCurrency = new com.planno.store.payment.service.PaymentProviderPaymentDetails(valid.providerPaymentId(), valid.providerCheckoutId(),
+                valid.providerMerchantId(), valid.status(), valid.statusDetail(), valid.amount(), "USD", valid.paymentMethod(), valid.externalReference());
+        var wrongMerchant = new com.planno.store.payment.service.PaymentProviderPaymentDetails(valid.providerPaymentId(), valid.providerCheckoutId(),
+                "different-account", valid.status(), valid.statusDetail(), valid.amount(), valid.currency(), valid.paymentMethod(), valid.externalReference());
+        for (var invalid : java.util.List.of(wrongAmount, wrongCurrency, wrongMerchant)) {
+            Assertions.assertThrows(com.planno.store.core.exception.ConflictException.class,
+                    () -> webhookService.reconcilePaymentFromProvider(payment, invalid, "synthetic-test"));
+            Assertions.assertEquals(initialStatus, paymentRepository.findById(payment.getId()).orElseThrow().getStatus());
+        }
+    }
+
+    @Autowired private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+    @Test
+    void concurrentProviderEventsCommitInventoryOnlyOnce() throws Exception {
+        Scenario scenario = createScenario("concurrent-payment", "concurrent-payment@example.com", "concurrent-product", "SKU-CON", "40.00", "12.90", 2, 8);
+        String merchant = connectMercadoPagoAccount("concurrent-payment", scenario.adminToken(), "oauth-concurrent");
+        String response = initiatePayment("concurrent-payment", scenario);
+        String checkout = objectMapper.readTree(response).get("externalCheckoutId").asText();
+        stubMercadoPagoPaymentProviderClient.simulatePaymentStatus(checkout, PaymentStatus.APPROVED, "pix");
+        var barrier = new java.util.concurrent.CyclicBarrier(2);
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var futures = new java.util.ArrayList<java.util.concurrent.Future<?>>();
+            for (int i = 0; i < 2; i++) {
+                String id = "concurrent-event-" + i;
+                futures.add(pool.submit(() -> {
+                    try { barrier.await(5, java.util.concurrent.TimeUnit.SECONDS); sendWebhook(id, checkout, paymentWebhookPayload(checkout, merchant)); }
+                    catch (Exception failure) { throw new RuntimeException(failure); }
+                }));
+            }
+            for (var future : futures) future.get(10, java.util.concurrent.TimeUnit.SECONDS);
+        }
+        var stock = inventoryItemRepository.findByProductIdAndProductStoreId(scenario.productId(), scenario.store().getId()).orElseThrow();
+        Assertions.assertEquals(6, stock.getQuantityAvailable());
+        Assertions.assertEquals(0, stock.getQuantityReserved());
+        Assertions.assertEquals(OrderStatus.PAID, orderRepository.findById(scenario.orderId()).orElseThrow().getStatus());
+    }
+
+    @Test
+    void webhookIsNotMarkedProcessedWhenFinancialTransactionRollsBack() throws Exception {
+        Scenario scenario = createScenario("rollback-payment", "rollback-payment@example.com", "rollback-product", "SKU-ROLL", "40.00", "12.90", 2, 8);
+        String merchant = connectMercadoPagoAccount("rollback-payment", scenario.adminToken(), "oauth-rollback");
+        String response = initiatePayment("rollback-payment", scenario);
+        String checkout = objectMapper.readTree(response).get("externalCheckoutId").asText();
+        stubMercadoPagoPaymentProviderClient.simulatePaymentStatus(checkout, PaymentStatus.APPROVED, "pix");
+        String signature = signatureHeader("rollback-event", checkout);
+        String payload = paymentWebhookPayload(checkout, merchant);
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        Assertions.assertThrows(IllegalStateException.class, () -> transaction.execute(status -> {
+            webhookService.processMercadoPagoWebhook(payload, signature, "rollback-event", checkout);
+            throw new IllegalStateException("Synthetic rollback after processing");
+        }));
+        var event = webhookEventRepository.findByProviderAndExternalEventId(com.planno.store.payment.domain.PaymentProvider.MERCADO_PAGO, "rollback-event").orElseThrow();
+        Assertions.assertFalse(event.isProcessed());
+        Assertions.assertEquals(OrderStatus.WAITING_PAYMENT, orderRepository.findById(scenario.orderId()).orElseThrow().getStatus());
+        sendWebhook("rollback-event", checkout, payload);
+        Assertions.assertTrue(webhookEventRepository.findById(event.getId()).orElseThrow().isProcessed());
+        Assertions.assertEquals(OrderStatus.PAID, orderRepository.findById(scenario.orderId()).orElseThrow().getStatus());
+    }
+
     private static final String CART_HEADER = "X-Cart-Token";
     private static final String WEBHOOK_SECRET = "test-webhook-secret";
 
@@ -141,6 +218,7 @@ class PaymentWebhookIntegrationTests extends AbstractIntegrationTest {
         Scenario scenario = createScenario("store-a", "admin@example.com", "produto-transparent", "SKU-TP", "40.00", "12.90", 2, 8);
 
         mockMvc.perform(post("/api/v1/public/payments/transparent")
+                        .header(CART_HEADER, scenario.cartToken())
                         .header(STORE_HEADER, "store-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CreateTransparentPaymentRequest(
@@ -161,6 +239,7 @@ class PaymentWebhookIntegrationTests extends AbstractIntegrationTest {
         connectMercadoPagoAccount("store-a", scenario.adminToken(), "oauth-transparent");
 
         String response = mockMvc.perform(post("/api/v1/public/payments/transparent")
+                        .header(CART_HEADER, scenario.cartToken())
                         .header(STORE_HEADER, "store-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CreateTransparentPaymentRequest(
@@ -196,6 +275,7 @@ class PaymentWebhookIntegrationTests extends AbstractIntegrationTest {
 
         createStore("store-b");
         mockMvc.perform(post("/api/v1/public/payments/transparent")
+                        .header(CART_HEADER, scenario.cartToken())
                         .header(STORE_HEADER, "store-b")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CreateTransparentPaymentRequest(
@@ -221,6 +301,7 @@ class PaymentWebhookIntegrationTests extends AbstractIntegrationTest {
 
         jdbcTemplate.update("update payment_provider_accounts set public_key = null where store_id = ?", scenario.store().getId());
         mockMvc.perform(post("/api/v1/public/payments/transparent")
+                        .header(CART_HEADER, scenario.cartToken())
                         .header(STORE_HEADER, "store-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CreateTransparentPaymentRequest(
@@ -240,6 +321,7 @@ class PaymentWebhookIntegrationTests extends AbstractIntegrationTest {
 
         connectMercadoPagoAccount("store-a", scenario.adminToken(), "oauth-transparent-2b");
         mockMvc.perform(post("/api/v1/public/payments/transparent")
+                        .header(CART_HEADER, scenario.cartToken())
                         .header(STORE_HEADER, "store-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CreateTransparentPaymentRequest(
@@ -268,6 +350,7 @@ class PaymentWebhookIntegrationTests extends AbstractIntegrationTest {
                 .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/v1/public/payments/transparent")
+                        .header(CART_HEADER, cancelled.cartToken())
                         .header(STORE_HEADER, "store-b")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CreateTransparentPaymentRequest(
@@ -292,6 +375,7 @@ class PaymentWebhookIntegrationTests extends AbstractIntegrationTest {
         String providerUserId = connectMercadoPagoAccount("store-a", scenario.adminToken(), "oauth-transparent-4");
 
         String response = mockMvc.perform(post("/api/v1/public/payments/transparent")
+                        .header(CART_HEADER, scenario.cartToken())
                         .header(STORE_HEADER, "store-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CreateTransparentPaymentRequest(
@@ -334,6 +418,7 @@ class PaymentWebhookIntegrationTests extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.status").value("PAID"));
 
         mockMvc.perform(post("/api/v1/public/payments/transparent")
+                        .header(CART_HEADER, scenario.cartToken())
                         .header(STORE_HEADER, "store-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CreateTransparentPaymentRequest(
@@ -368,6 +453,7 @@ class PaymentWebhookIntegrationTests extends AbstractIntegrationTest {
         Scenario scenario = createScenario("store-a", "admin@example.com", "produto-pagamento", "SKU-PAY", "40.00", "12.90", 2, 8);
 
         mockMvc.perform(post("/api/v1/public/payments")
+                        .header(CART_HEADER, scenario.cartToken())
                         .header(STORE_HEADER, "store-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CreatePaymentRequest(scenario.orderId()))))
@@ -376,6 +462,7 @@ class PaymentWebhookIntegrationTests extends AbstractIntegrationTest {
         connectMercadoPagoAccount("store-a", scenario.adminToken(), "oauth-code-store-a");
 
         String paymentResponse = mockMvc.perform(post("/api/v1/public/payments")
+                        .header(CART_HEADER, scenario.cartToken())
                         .header(STORE_HEADER, "store-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CreatePaymentRequest(scenario.orderId()))))
@@ -407,6 +494,7 @@ class PaymentWebhookIntegrationTests extends AbstractIntegrationTest {
 
         createStore("store-b");
         mockMvc.perform(post("/api/v1/public/payments")
+                        .header(CART_HEADER, scenario.cartToken())
                         .header(STORE_HEADER, "store-b")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CreatePaymentRequest(scenario.orderId()))))
@@ -421,8 +509,8 @@ class PaymentWebhookIntegrationTests extends AbstractIntegrationTest {
         String providerUserIdA = connectMercadoPagoAccount("store-a", storeA.adminToken(), "oauth-a");
         String providerUserIdB = connectMercadoPagoAccount("store-b", storeB.adminToken(), "oauth-b");
 
-        String paymentResponseA = initiatePayment("store-a", storeA.orderId());
-        String paymentResponseB = initiatePayment("store-b", storeB.orderId());
+        String paymentResponseA = initiatePayment("store-a", storeA);
+        String paymentResponseB = initiatePayment("store-b", storeB);
         String checkoutIdA = objectMapper.readTree(paymentResponseA).get("externalCheckoutId").asText();
         String checkoutIdB = objectMapper.readTree(paymentResponseB).get("externalCheckoutId").asText();
 
@@ -460,7 +548,7 @@ class PaymentWebhookIntegrationTests extends AbstractIntegrationTest {
         Scenario scenario = createScenario("store-a", "admin@example.com", "produto-rejeitado", "SKU-REJ", "50.00", "9.90", 2, 6);
         String providerUserId = connectMercadoPagoAccount("store-a", scenario.adminToken(), "oauth-rej");
 
-        String paymentResponse = initiatePayment("store-a", scenario.orderId());
+        String paymentResponse = initiatePayment("store-a", scenario);
         String checkoutId = objectMapper.readTree(paymentResponse).get("externalCheckoutId").asText();
         stubMercadoPagoPaymentProviderClient.simulatePaymentStatus(checkoutId, PaymentStatus.REJECTED, "credit_card");
 
@@ -481,6 +569,7 @@ class PaymentWebhookIntegrationTests extends AbstractIntegrationTest {
 
         Scenario nextScenario = createScenario("store-a", "admin@example.com", "produto-novo", "SKU-NEW", "20.00", "5.00", 1, 3);
         mockMvc.perform(post("/api/v1/public/payments")
+                        .header(CART_HEADER, nextScenario.cartToken())
                         .header(STORE_HEADER, "store-a")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CreatePaymentRequest(nextScenario.orderId()))))
@@ -514,11 +603,12 @@ class PaymentWebhookIntegrationTests extends AbstractIntegrationTest {
                 .getProviderUserId();
     }
 
-    private String initiatePayment(String storeSlug, UUID orderId) throws Exception {
+    private String initiatePayment(String storeSlug, Scenario scenario) throws Exception {
         return mockMvc.perform(post("/api/v1/public/payments")
+                        .header(CART_HEADER, scenario.cartToken())
                         .header(STORE_HEADER, storeSlug)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new CreatePaymentRequest(orderId))))
+                        .content(objectMapper.writeValueAsString(new CreatePaymentRequest(scenario.orderId()))))
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()
@@ -571,7 +661,8 @@ class PaymentWebhookIntegrationTests extends AbstractIntegrationTest {
                 store,
                 adminToken,
                 UUID.fromString(objectMapper.readTree(orderResponse).get("id").asText()),
-                UUID.fromString(productId)
+                UUID.fromString(productId),
+                cartToken
         );
     }
 
@@ -719,6 +810,6 @@ class PaymentWebhookIntegrationTests extends AbstractIntegrationTest {
         );
     }
 
-    private record Scenario(Store store, String adminToken, UUID orderId, UUID productId) {
+    private record Scenario(Store store, String adminToken, UUID orderId, UUID productId, String cartToken) {
     }
 }

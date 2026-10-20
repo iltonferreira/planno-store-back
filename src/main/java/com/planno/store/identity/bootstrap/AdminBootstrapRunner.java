@@ -86,9 +86,9 @@ public class AdminBootstrapRunner implements ApplicationRunner {
         );
         if (!assignmentExists) {
             assignmentRepository.save(new UserRoleAssignment(user, adminRole, activeStore.get()));
-            log.info("Admin bootstrap linked '{}' to the active store with ADMIN role.", user.getEmail());
+            log.info("Admin bootstrap linked user {} to the active store with ADMIN role.", user.getId());
         } else {
-            log.info("Admin bootstrap skipped role assignment because it already exists for '{}'.", user.getEmail());
+            log.info("Admin bootstrap skipped existing role assignment for user {}.", user.getId());
         }
     }
 

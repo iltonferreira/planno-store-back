@@ -1,0 +1,497 @@
+{
+  "date": "2026-10-11",
+  "environment": {
+    "postgres_version": "17.8",
+    "operating_system": "macOS Darwin arm64",
+    "binary_artifact": "io.zonky.test.postgres:embedded-postgres-binaries-darwin-arm64v8:17.8.0",
+    "archive_sha256": "19022eadefcbb09274519e88daa3cf3f5888d5fdd96beaf63922285970e6adc3",
+    "server_environment": "PostgreSQL 17.8 on x86_64-apple-darwin24.6.0, compiled by Apple clang version 17.0.0 (clang-1700.6.3.2), 64-bit\nlisten_addresses=127.0.0.1\nport=50217\napplication_role=planno_test_app (NOSUPERUSER, NOCREATEDB, NOCREATEROLE)\ncluster=/private/tmp/planno-pg-7628042416865809915\n",
+    "cleanup": "Owned PostgreSQL stopped; temporary cluster deleted.\n",
+    "cluster_removed_verified": true
+  },
+  "postgres_final": {
+    "suite_count": 22,
+    "totals": {
+      "tests": 182,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "suites": [
+      {
+        "name": "com.planno.store.CartPricingIntegrationTests",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.CatalogInventoryIntegrationTests",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.CheckoutAuthorizationIntegrationTests",
+        "tests": "18",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.DashboardIntegrationTests",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.FinancialRefundRegressionTests",
+        "tests": "20",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.InventoryConcurrencyTests",
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.LatePaymentApprovalIntegrationTests",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.LoginRateLimiterTests",
+        "tests": "2",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.MercadoPagoCheckoutContractTests",
+        "tests": "15",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.MercadoPagoPaymentStatusContractTests",
+        "tests": "14",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.OrderReservationExpirationIntegrationTests",
+        "tests": "29",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.PaymentInitiationSafetyIntegrationTests",
+        "tests": "10",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.PaymentWebhookIntegrationTests",
+        "tests": "10",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.PlannoStoreBackApplicationTests",
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.PlatformStoreAndPublicContractsIntegrationTests",
+        "tests": "10",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.PostgresPersistenceIT",
+        "tests": "8",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.ProductionSafetyConfigurationTests",
+        "tests": "9",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.PromotionsCouponsIntegrationTests",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.ReconciliationIntegrationTests",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.RefundIntegrationTests",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.SecurityIntegrationTests",
+        "tests": "7",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.ShippingOrderIntegrationTests",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      }
+    ]
+  },
+  "h2_regression": {
+    "suite_count": 21,
+    "totals": {
+      "tests": 174,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "suites": [
+      {
+        "name": "com.planno.store.CartPricingIntegrationTests",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.CatalogInventoryIntegrationTests",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.CheckoutAuthorizationIntegrationTests",
+        "tests": "18",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.DashboardIntegrationTests",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.FinancialRefundRegressionTests",
+        "tests": "20",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.InventoryConcurrencyTests",
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.LatePaymentApprovalIntegrationTests",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.LoginRateLimiterTests",
+        "tests": "2",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.MercadoPagoCheckoutContractTests",
+        "tests": "15",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.MercadoPagoPaymentStatusContractTests",
+        "tests": "14",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.OrderReservationExpirationIntegrationTests",
+        "tests": "29",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.PaymentInitiationSafetyIntegrationTests",
+        "tests": "10",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.PaymentWebhookIntegrationTests",
+        "tests": "10",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.PlannoStoreBackApplicationTests",
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.PlatformStoreAndPublicContractsIntegrationTests",
+        "tests": "10",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.ProductionSafetyConfigurationTests",
+        "tests": "9",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.PromotionsCouponsIntegrationTests",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.ReconciliationIntegrationTests",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.RefundIntegrationTests",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.SecurityIntegrationTests",
+        "tests": "7",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "com.planno.store.ShippingOrderIntegrationTests",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      }
+    ]
+  },
+  "red_evidence": [
+    {
+      "source": "/private/tmp/planno-postgres-evidence-o43zny_r/webhook-transaction-red.log",
+      "sha256": "8aa2919fddf5961858e54cf843827a59b6247a84e76b940767059278d49d2f9b",
+      "observations": [
+        {
+          "line": 109,
+          "text": "2026-10-11T21:35:29.527-03:00  WARN 38991 --- [planno-store-back] [pool-3-thread-2] o.h.engine.jdbc.spi.SqlExceptionHelper   : SQL Error: 0, SQLState: 23505"
+        },
+        {
+          "line": 112,
+          "text": "2026-10-11T21:35:29.530-03:00  WARN 38991 --- [planno-store-back] [pool-3-thread-2] o.h.engine.jdbc.spi.SqlExceptionHelper   : SQL Error: 0, SQLState: 25P02"
+        },
+        {
+          "line": 152,
+          "text": "[ERROR] Tests run: 5, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 4.105 s <<< FAILURE! -- in com.planno.store.PostgresPersistenceIT"
+        },
+        {
+          "line": 354,
+          "text": "[ERROR] Tests run: 5, Failures: 1, Errors: 0, Skipped: 0"
+        }
+      ]
+    },
+    {
+      "source": "/private/tmp/planno-postgres-evidence-o43zny_r/financial-lock-red.log",
+      "sha256": "797a09e7422a624ff4254af5401f3f637f1d146084c3d6d14211081fada5955c",
+      "observations": [
+        {
+          "line": 113,
+          "text": "[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 3.937 s <<< FAILURE! -- in com.planno.store.PostgresPersistenceIT"
+        },
+        {
+          "line": 115,
+          "text": "org.opentest4j.AssertionFailedError: Lock acquisition must precede the authoritative refresh; an old MVCC snapshot is unsafe ==> expected: <CANCELLED> but was: <WAITING_PAYMENT>"
+        },
+        {
+          "line": 130,
+          "text": "[ERROR]   PostgresPersistenceIT.orderLockMustRefreshCommittedStateAfterWaitingForConcurrentWriter:192 Lock acquisition must precede the authoritative refresh; an old MVCC snapshot is unsafe ==> expected: <CANCELLED> but was: <WAITING_PAYMENT>"
+        },
+        {
+          "line": 132,
+          "text": "[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0"
+        }
+      ]
+    },
+    {
+      "source": "/private/tmp/planno-postgres-evidence-o43zny_r/full-red/verify.log",
+      "sha256": "9f2fe26c177fe3a6eead6a144e325f66fe69b5d77b10cebe0ebada154223a1e1",
+      "observations": [
+        {
+          "line": 311,
+          "text": "2026-10-11T21:36:29.289-03:00  WARN 39100 --- [planno-store-back] [pool-3-thread-2] o.h.engine.jdbc.spi.SqlExceptionHelper   : SQL Error: 0, SQLState: 23505"
+        },
+        {
+          "line": 448,
+          "text": "[ERROR] Tests run: 29, Failures: 0, Errors: 2, Skipped: 0, Time elapsed: 0.915 s <<< FAILURE! -- in com.planno.store.OrderReservationExpirationIntegrationTests"
+        },
+        {
+          "line": 652,
+          "text": "2026-10-11T21:36:34.383-03:00  WARN 39100 --- [planno-store-back] [           main] o.h.engine.jdbc.spi.SqlExceptionHelper   : SQL Error: 0, SQLState: 42883"
+        },
+        {
+          "line": 653,
+          "text": "2026-10-11T21:36:34.383-03:00 ERROR 39100 --- [planno-store-back] [           main] o.h.engine.jdbc.spi.SqlExceptionHelper   : ERROR: function upper(bytea) does not exist"
+        },
+        {
+          "line": 730,
+          "text": "[ERROR] Tests run: 10, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 1.090 s <<< FAILURE! -- in com.planno.store.PlatformStoreAndPublicContractsIntegrationTests"
+        },
+        {
+          "line": 750,
+          "text": "2026-10-11T21:36:34.898-03:00  WARN 39100 --- [planno-store-back] [           main] o.h.engine.jdbc.spi.SqlExceptionHelper   : SQL Error: 0, SQLState: 42883"
+        },
+        {
+          "line": 751,
+          "text": "2026-10-11T21:36:34.898-03:00 ERROR 39100 --- [planno-store-back] [           main] o.h.engine.jdbc.spi.SqlExceptionHelper   : ERROR: function upper(bytea) does not exist"
+        },
+        {
+          "line": 1214,
+          "text": "2026-10-11T21:36:35.268-03:00  WARN 39100 --- [planno-store-back] [           main] o.h.engine.jdbc.spi.SqlExceptionHelper   : SQL Error: 0, SQLState: 42883"
+        },
+        {
+          "line": 1215,
+          "text": "2026-10-11T21:36:35.268-03:00 ERROR 39100 --- [planno-store-back] [           main] o.h.engine.jdbc.spi.SqlExceptionHelper   : ERROR: function upper(bytea) does not exist"
+        },
+        {
+          "line": 2085,
+          "text": "[ERROR] Tests run: 4, Failures: 2, Errors: 0, Skipped: 0, Time elapsed: 0.640 s <<< FAILURE! -- in com.planno.store.ReconciliationIntegrationTests"
+        },
+        {
+          "line": 2516,
+          "text": "[ERROR] Tests run: 10, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 1.264 s <<< FAILURE! -- in com.planno.store.PaymentWebhookIntegrationTests"
+        },
+        {
+          "line": 2550,
+          "text": "[ERROR] Tests run: 179, Failures: 3, Errors: 3, Skipped: 0"
+        }
+      ]
+    },
+    {
+      "source": "/private/tmp/planno-postgres-evidence-o43zny_r/second-full-red/verify.log",
+      "sha256": "6cdbb7fc1889cd015224487668069b31fe7c1a3e4f0991befab0a426b8a13ab6",
+      "observations": [
+        {
+          "line": 267,
+          "text": "2026-10-11T21:40:17.694-03:00  WARN 39397 --- [planno-store-back] [           main] o.h.engine.jdbc.spi.SqlExceptionHelper   : SQL Error: 0, SQLState: 42P18"
+        },
+        {
+          "line": 268,
+          "text": "2026-10-11T21:40:17.694-03:00 ERROR 39397 --- [planno-store-back] [           main] o.h.engine.jdbc.spi.SqlExceptionHelper   : ERROR: could not determine data type of parameter $8"
+        },
+        {
+          "line": 269,
+          "text": "2026-10-11T21:40:17.756-03:00  WARN 39397 --- [planno-store-back] [pool-4-thread-2] o.h.engine.jdbc.spi.SqlExceptionHelper   : SQL Error: 0, SQLState: 23505"
+        },
+        {
+          "line": 310,
+          "text": "[ERROR] Tests run: 8, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 0.685 s <<< FAILURE! -- in com.planno.store.PostgresPersistenceIT"
+        },
+        {
+          "line": 312,
+          "text": "org.springframework.dao.InvalidDataAccessResourceUsageException: JDBC exception executing SQL [select we1_0.id,we1_0.created_at,we1_0.created_by,we1_0.event_type,we1_0.external_event_id,we1_0.last_reprocess_result,we1_0.last_reprocessed_at,we1_0.last_reprocessed_by,we1_0.order_id,we1_0.payload,we1_0.payment_id,we1_0.processed,we1_0.processed_at,we1_0.processing_result,we1_0.provider,we1_0.refund_id,we1_0.reprocess_count,s1_0.id,s1_0.banner_url,s1_0.commission_rate,s1_0.contact_email,s1_0.created_at,s1_0.created_by,s1_0.currency,s1_0.description,s1_0.logo_url,s1_0.name,s1_0.primary_color,s1_0.public_domain,s1_0.secondary_color,s1_0.slug,s1_0.status,s1_0.timezone,s1_0.updated_at,s1_0.updated_by,we1_0.updated_at,we1_0.updated_by from public.webhook_events we1_0 left join public.stores s1_0 on s1_0.id=we1_0.store_id where we1_0.store_id=? and (? is null or we1_0.provider=?) and (? is null or we1_0.processed=?) and (? is null or upper(we1_0.event_type)=upper(cast(? as varchar))) and (? is null or we1_0.created_at>=?) and (? is null or we1_0.created_at<=?) order by we1_0.created_at desc] [ERROR: could not determine data type of parameter $8] [n/a]; SQL [n/a]"
+        },
+        {
+          "line": 341,
+          "text": "Caused by: org.hibernate.exception.SQLGrammarException: JDBC exception executing SQL [select we1_0.id,we1_0.created_at,we1_0.created_by,we1_0.event_type,we1_0.external_event_id,we1_0.last_reprocess_result,we1_0.last_reprocessed_at,we1_0.last_reprocessed_by,we1_0.order_id,we1_0.payload,we1_0.payment_id,we1_0.processed,we1_0.processed_at,we1_0.processing_result,we1_0.provider,we1_0.refund_id,we1_0.reprocess_count,s1_0.id,s1_0.banner_url,s1_0.commission_rate,s1_0.contact_email,s1_0.created_at,s1_0.created_by,s1_0.currency,s1_0.description,s1_0.logo_url,s1_0.name,s1_0.primary_color,s1_0.public_domain,s1_0.secondary_color,s1_0.slug,s1_0.status,s1_0.timezone,s1_0.updated_at,s1_0.updated_by,we1_0.updated_at,we1_0.updated_by from public.webhook_events we1_0 left join public.stores s1_0 on s1_0.id=we1_0.store_id where we1_0.store_id=? and (? is null or we1_0.provider=?) and (? is null or we1_0.processed=?) and (? is null or upper(we1_0.event_type)=upper(cast(? as varchar))) and (? is null or we1_0.created_at>=?) and (? is null or we1_0.created_at<=?) order by we1_0.created_at desc] [ERROR: could not determine data type of parameter $8] [n/a]"
+        },
+        {
+          "line": 380,
+          "text": "Caused by: org.postgresql.util.PSQLException: ERROR: could not determine data type of parameter $8"
+        },
+        {
+          "line": 485,
+          "text": "2026-10-11T21:40:23.503-03:00  WARN 39397 --- [planno-store-back] [           main] o.h.engine.jdbc.spi.SqlExceptionHelper   : SQL Error: 0, SQLState: 42P18"
+        },
+        {
+          "line": 486,
+          "text": "2026-10-11T21:40:23.503-03:00 ERROR 39397 --- [planno-store-back] [           main] o.h.engine.jdbc.spi.SqlExceptionHelper   : ERROR: could not determine data type of parameter $8"
+        },
+        {
+          "line": 939,
+          "text": "2026-10-11T21:40:23.874-03:00  WARN 39397 --- [planno-store-back] [           main] o.h.engine.jdbc.spi.SqlExceptionHelper   : SQL Error: 0, SQLState: 42P18"
+        },
+        {
+          "line": 940,
+          "text": "2026-10-11T21:40:23.875-03:00 ERROR 39397 --- [planno-store-back] [           main] o.h.engine.jdbc.spi.SqlExceptionHelper   : ERROR: could not determine data type of parameter $8"
+        },
+        {
+          "line": 1808,
+          "text": "[ERROR] Tests run: 4, Failures: 2, Errors: 0, Skipped: 0, Time elapsed: 0.644 s <<< FAILURE! -- in com.planno.store.ReconciliationIntegrationTests"
+        },
+        {
+          "line": 1846,
+          "text": "[ERROR]   PostgresPersistenceIT.optionalWebhookSearchTextPreservesCaseAndTenantIsolationOnPostgres:222 » InvalidDataAccessResourceUsage JDBC exception executing SQL [select we1_0.id,we1_0.created_at,we1_0.created_by,we1_0.event_type,we1_0.external_event_id,we1_0.last_reprocess_result,we1_0.last_reprocessed_at,we1_0.last_reprocessed_by,we1_0.order_id,we1_0.payload,we1_0.payment_id,we1_0.processed,we1_0.processed_at,we1_0.processing_result,we1_0.provider,we1_0.refund_id,we1_0.reprocess_count,s1_0.id,s1_0.banner_url,s1_0.commission_rate,s1_0.contact_email,s1_0.created_at,s1_0.created_by,s1_0.currency,s1_0.description,s1_0.logo_url,s1_0.name,s1_0.primary_color,s1_0.public_domain,s1_0.secondary_color,s1_0.slug,s1_0.status,s1_0.timezone,s1_0.updated_at,s1_0.updated_by,we1_0.updated_at,we1_0.updated_by from public.webhook_events we1_0 left join public.stores s1_0 on s1_0.id=we1_0.store_id where we1_0.store_id=? and (? is null or we1_0.provider=?) and (? is null or we1_0.processed=?) and (? is null or upper(we1_0.event_type)=upper(cast(? as varchar))) and (? is null or we1_0.created_at>=?) and (? is null or we1_0.created_at<=?) order by we1_0.created_at desc] [ERROR: could not determine data type of parameter $8] [n/a]; SQL [n/a]"
+        },
+        {
+          "line": 1848,
+          "text": "[ERROR] Tests run: 182, Failures: 2, Errors: 1, Skipped: 0"
+        }
+      ]
+    }
+  ]
+}

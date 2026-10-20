@@ -1,0 +1,26 @@
+{
+  "timestamp_utc": "2026-10-12T15:43:12.536203+00:00",
+  "classification": "BROWSER_FORM_VALIDATION_ONLY",
+  "application": "planno-store",
+  "observations": [
+    {
+      "candidate": "http://127.0.0.1:8765/mercadopago/oauth-test/callback",
+      "accepted": false,
+      "message": "Insira um URL que comece com https://."
+    },
+    {
+      "candidate": "https://127.0.0.1:8765/mercadopago/oauth-test/callback",
+      "accepted": false,
+      "message": "Revise a URL inserida"
+    },
+    {
+      "candidate": "https://localhost:8765/mercadopago/oauth-test/callback",
+      "accepted": false,
+      "message": "Revise a URL inserida"
+    }
+  ],
+  "previous_draft_url_restored": true,
+  "application_settings_saved": false,
+  "oauth_token_requests": 0,
+  "public_endpoint_created": false
+}

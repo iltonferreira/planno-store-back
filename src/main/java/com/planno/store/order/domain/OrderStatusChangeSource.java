@@ -5,5 +5,6 @@ public enum OrderStatusChangeSource {
     ADMIN,
     PAYMENT_WEBHOOK,
     REFUND,
-    REFUND_WEBHOOK
+    REFUND_WEBHOOK,
+    RESERVATION_EXPIRATION
 }

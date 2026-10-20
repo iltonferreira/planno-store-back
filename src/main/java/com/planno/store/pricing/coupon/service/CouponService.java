@@ -156,9 +156,24 @@ public class CouponService {
         if (couponId == null) {
             return;
         }
-        Coupon coupon = couponRepository.findWithLockByIdAndStoreId(couponId, currentStoreProvider.getCurrentStoreId())
-                .orElseThrow(() -> new NotFoundException("Coupon not found"));
-        coupon.decrementUsage();
+        releaseUsage(currentStoreProvider.getCurrentStoreId(), couponId);
+    }
+
+    @Transactional
+    public void releaseUsage(UUID storeId, UUID couponId) {
+        if (couponId == null) {
+            return;
+        }
+        var coupon = couponRepository.findWithLockByIdAndStoreId(couponId, storeId);
+        if (coupon.isPresent()) {
+            coupon.get().decrementUsage();
+            return;
+        }
+        // Orders retain a coupon snapshot after an authorized administrator deletes the coupon.
+        // A deleted coupon has no usage counter left to release; an existing foreign coupon is invalid.
+        if (couponRepository.existsById(couponId)) {
+            throw new NotFoundException("Coupon not found");
+        }
     }
 
     @Transactional(readOnly = true)

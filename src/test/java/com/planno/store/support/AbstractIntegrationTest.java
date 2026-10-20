@@ -23,6 +23,7 @@ import com.planno.store.payment.account.repository.PaymentProviderAccountReposit
 import com.planno.store.payment.account.repository.PaymentProviderOAuthStateRepository;
 import com.planno.store.payment.refund.repository.RefundRepository;
 import com.planno.store.payment.repository.PaymentRepository;
+import com.planno.store.payment.repository.PaymentInitiationJournalRepository;
 import com.planno.store.payment.repository.WebhookEventRepository;
 import com.planno.store.pricing.coupon.repository.CouponRepository;
 import com.planno.store.pricing.promotion.repository.PromotionRepository;
@@ -39,11 +40,16 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.mail.javamail.JavaMailSender;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 public abstract class AbstractIntegrationTest {
+
+    @MockitoBean
+    protected JavaMailSender javaMailSender;
 
     protected static final String STORE_HEADER = "X-Store-Slug";
 
@@ -108,6 +114,9 @@ public abstract class AbstractIntegrationTest {
     protected PaymentRepository paymentRepository;
 
     @Autowired
+    protected PaymentInitiationJournalRepository paymentInitiationJournalRepository;
+
+    @Autowired
     protected WebhookEventRepository webhookEventRepository;
 
     @Autowired
@@ -133,6 +142,8 @@ public abstract class AbstractIntegrationTest {
 
     @BeforeEach
     void cleanDatabase() {
+        PostgresTestDatabase.assertSafeCleanup(jdbcTemplate);
+        paymentInitiationJournalRepository.deleteAllInBatch();
         webhookEventRepository.deleteAllInBatch();
         refundRepository.deleteAllInBatch();
         paymentRepository.deleteAllInBatch();

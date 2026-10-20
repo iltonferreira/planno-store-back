@@ -3,7 +3,7 @@ package com.planno.store.payment.service;
 import com.planno.store.core.exception.BusinessException;
 import com.planno.store.payment.config.PaymentProperties;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
+import java.security.MessageDigest;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.http.HttpStatus;
@@ -52,9 +52,9 @@ public class MercadoPagoWebhookSignatureVerifier {
             throw new BusinessException(HttpStatus.UNAUTHORIZED, "Invalid Mercado Pago webhook signature");
         }
 
-        String manifest = "id:" + dataId.toLowerCase() + ";request-id:" + xRequestId + ";ts:" + timestamp + ";";
+        String manifest = "id:" + dataId.toLowerCase(java.util.Locale.ROOT) + ";request-id:" + xRequestId + ";ts:" + timestamp + ";";
         String computedHash = hmacSha256(secret, manifest);
-        if (!Arrays.equals(receivedHash.getBytes(StandardCharsets.UTF_8), computedHash.getBytes(StandardCharsets.UTF_8))) {
+        if (!MessageDigest.isEqual(receivedHash.getBytes(StandardCharsets.UTF_8), computedHash.getBytes(StandardCharsets.UTF_8))) {
             throw new BusinessException(HttpStatus.UNAUTHORIZED, "Invalid Mercado Pago webhook signature");
         }
     }

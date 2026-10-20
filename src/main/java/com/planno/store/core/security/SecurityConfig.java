@@ -18,6 +18,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import com.planno.store.core.storecontext.StoreContextFilter;
 
 @Configuration
@@ -28,16 +29,27 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final StoreContextFilter storeContextFilter;
+    private final CloudflarePreviewWriteGuardFilter cloudflarePreviewWriteGuardFilter;
     private final UserDetailsService userDetailsService;
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthenticationFilter,
             StoreContextFilter storeContextFilter,
+            CloudflarePreviewWriteGuardFilter cloudflarePreviewWriteGuardFilter,
             UserDetailsService userDetailsService
     ) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.storeContextFilter = storeContextFilter;
+        this.cloudflarePreviewWriteGuardFilter = cloudflarePreviewWriteGuardFilter;
         this.userDetailsService = userDetailsService;
+    }
+
+    @Bean
+    FilterRegistrationBean<CloudflarePreviewWriteGuardFilter> cloudflarePreviewWriteGuardServletRegistration(
+            CloudflarePreviewWriteGuardFilter filter) {
+        FilterRegistrationBean<CloudflarePreviewWriteGuardFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     @Bean
@@ -65,6 +77,7 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())
+                .addFilterBefore(cloudflarePreviewWriteGuardFilter, org.springframework.web.filter.CorsFilter.class)
                 .addFilterBefore(storeContextFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

@@ -15,12 +15,23 @@ spring:
   sql:
     init:
       mode: never
+  mail:
+    host: localhost
+    port: 2525
+
+management:
+  health:
+    mail:
+      enabled: false
 
 app:
+  order-reservation:
+    enabled: false
   store-provisioning:
     service-token: test-store-provisioning-token-with-at-least-32-chars
     domain-suffix: planno.test
   payment:
+    operations-enabled: true
     credentials-encryption-key-base64: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
     oauth:
       state-ttl-minutes: 10
@@ -36,12 +47,15 @@ app:
       failure-url: http://localhost:3000/checkout/failure
       api-base-url: https://api.mercadopago.com
       auth-base-url: https://auth.mercadopago.com
+      test-token: true
   media:
     supabase:
       mock-enabled: true
       bucket: store-assets-test
       store-image-folder: stores
   security:
+    email-two-factor:
+      from: test-no-reply@example.test
     jwt:
       secret-base64: dGVzdC1zZWNyZXQtdGVzdC1zZWNyZXQtdGVzdC1zZWNyZXQtdGVzdA==
       expiration-minutes: 180

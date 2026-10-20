@@ -78,9 +78,11 @@ public class StoreProvisioningService {
         if (stores.existsBySlugIgnoreCase(slug)) {
             throw new ConflictException("Store slug already exists");
         }
+        var identity = request.identity();
         Store store = stores.save(Store.create(request.name(), slug, request.contactEmail(), "BRL",
-                "America/Sao_Paulo", "Empresa: " + request.companyName().trim(), null, null,
-                null, null, null));
+                "America/Sao_Paulo", identity == null ? "Empresa: " + request.companyName().trim() : identity.description(),
+                identity == null ? null : identity.logoUrl(), identity == null ? null : identity.bannerUrl(),
+                identity == null ? null : identity.primaryColor(), identity == null ? null : identity.secondaryColor(), null));
         store.setPublicDomain(publicDomain);
         if (users.findByEmailIgnoreCase(request.storeAdminEmail()).isPresent()) {
             throw new ConflictException("Store administrator already has an account; do not replace an existing password.");

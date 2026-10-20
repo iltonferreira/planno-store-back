@@ -18,13 +18,16 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final com.planno.store.identity.service.LoginRateLimiter rateLimiter;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, com.planno.store.identity.service.LoginRateLimiter rateLimiter) {
         this.authService = authService;
+        this.rateLimiter = rateLimiter;
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request, jakarta.servlet.http.HttpServletRequest httpRequest) {
+        rateLimiter.check(httpRequest.getRemoteAddr(), request.email());
         return ResponseEntity.ok(authService.login(request));
     }
 

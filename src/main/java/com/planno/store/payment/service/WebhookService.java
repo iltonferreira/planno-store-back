@@ -31,6 +31,8 @@ import org.springframework.util.StringUtils;
 @Service
 public class WebhookService {
 
+    private final com.planno.store.core.auditing.FinancialLock locks;
+
     private final MercadoPagoWebhookSignatureVerifier signatureVerifier;
     private final PaymentRepository paymentRepository;
     private final WebhookEventRepository webhookEventRepository;
@@ -52,8 +54,10 @@ public class WebhookService {
             InventoryService inventoryService,
             RefundService refundService,
             ObjectMapper objectMapper,
-            WebhookEventLifecycleService webhookEventLifecycleService
+            WebhookEventLifecycleService webhookEventLifecycleService ,
+            com.planno.store.core.auditing.FinancialLock locks
     ) {
+        this.locks = locks;
         this.signatureVerifier = signatureVerifier;
         this.paymentRepository = paymentRepository;
         this.webhookEventRepository = webhookEventRepository;
@@ -98,7 +102,7 @@ public class WebhookService {
 
             webhookEventLifecycleService.markProcessed(eventId, null, null, null, null, "Ignored unsupported Mercado Pago webhook event type " + eventType);
         } catch (RuntimeException exception) {
-            webhookEventLifecycleService.markFailed(eventId, null, null, null, null, exception.getMessage());
+            webhookEventLifecycleService.markFailed(eventId, null, null, null, null, exception.getClass().getSimpleName());
             throw exception;
         }
     }
@@ -118,8 +122,7 @@ public class WebhookService {
             webhookEventLifecycleService.markReprocessed(event.getId(), actor, "Reprocessed successfully");
             return ReconciliationResultResponse.of("WEBHOOK_EVENT", event.getId().toString(), true, "Webhook event reprocessed safely");
         } catch (RuntimeException | com.fasterxml.jackson.core.JsonProcessingException exception) {
-            webhookEventLifecycleService.markFailed(event.getId(), event.getStore(), event.getPaymentId(), event.getRefundId(), event.getOrderId(), exception.getMessage());
-            webhookEventLifecycleService.markReprocessed(event.getId(), actor, "Reprocess failed: " + exception.getMessage());
+            webhookEventLifecycleService.markFailedReprocess(event.getId(), actor);
             throw new BusinessException(HttpStatus.BAD_REQUEST, "Webhook event reprocessing failed");
         }
     }
@@ -136,9 +139,12 @@ public class WebhookService {
         PaymentProviderAccount account = resolveProviderAccount(providerUserId);
         PaymentProviderPaymentDetails providerPayment = paymentProviderClient.getPaymentDetails(account, dataId);
         Payment payment = resolvePayment(providerPayment, dataId);
+        validateAccount(payment, account);
         applyProviderState(payment, providerPayment, "mercado-pago-webhook");
         webhookEventLifecycleService.markProcessed(eventId, payment.getStore(), payment.getId(), null, payment.getOrder().getId(),
-                "Processed Mercado Pago payment webhook with status " + providerPayment.status().name());
+                payment.getStatus() == PaymentStatus.APPROVED && payment.getOrder().getStatus() == OrderStatus.CANCELLED
+                        ? "Late payment approved for cancelled order; manual reconciliation required; inventory unchanged"
+                        : "Processed Mercado Pago payment webhook with status " + providerPayment.status().name());
     }
 
     private void processRefundEvent(UUID eventId, JsonNode root, String dataId) {
@@ -146,10 +152,18 @@ public class WebhookService {
                 ? null
                 : root.path("user_id").asText();
         PaymentProviderAccount account = resolveProviderAccount(providerUserId);
-        PaymentProviderRefundDetails providerRefund = paymentProviderClient.getRefundDetails(account, dataId);
-        refundService.reconcileProviderRefund(PaymentProvider.MERCADO_PAGO, providerRefund, "Refund confirmed by Mercado Pago webhook");
+        Optional<Refund> localRefund = refundService.findOptionalByProviderRefundId(PaymentProvider.MERCADO_PAGO, dataId);
+        if (localRefund.isPresent()) {
+            validateAccount(localRefund.get().getPayment(), account);
+        }
+        String providerPaymentId = localRefund.map(refund -> refund.getPayment().getProviderPaymentId())
+                .orElseGet(() -> root.path("data").path("payment_id").isMissingNode()
+                        ? null : root.path("data").path("payment_id").asText(null));
+        PaymentProviderRefundDetails providerRefund = paymentProviderClient.getRefundDetails(account, providerPaymentId, dataId);
         Payment payment = paymentRepository.findByProviderAndProviderPaymentId(PaymentProvider.MERCADO_PAGO, providerRefund.providerPaymentId())
                 .orElseThrow(() -> new ConflictException("Unable to resolve payment for the Mercado Pago refund webhook event"));
+        validateAccount(payment, account);
+        refundService.reconcileProviderRefund(PaymentProvider.MERCADO_PAGO, providerRefund, "Refund confirmed by Mercado Pago webhook");
         Refund resolvedRefund = refundService.findByProviderRefundId(PaymentProvider.MERCADO_PAGO, providerRefund.providerRefundId());
         webhookEventLifecycleService.markProcessed(eventId, payment.getStore(), payment.getId(), resolvedRefund.getId(), payment.getOrder().getId(),
                 "Processed Mercado Pago refund webhook with status " + providerRefund.status().name());
@@ -204,8 +218,25 @@ public class WebhookService {
         return paymentProviderAccountService.getByProviderUserId(PaymentProvider.MERCADO_PAGO, providerUserId);
     }
 
+    private void validateAccount(Payment payment, PaymentProviderAccount account) {
+        if (!payment.getStore().getId().equals(account.getStore().getId())
+                || !account.getProviderUserId().equals(payment.getProviderMerchantId())) {
+            throw new ConflictException("Payment does not belong to the provider account");
+        }
+    }
+
     private void applyProviderState(Payment payment, PaymentProviderPaymentDetails providerPayment, String changedBy) {
+        payment = locks.payment(payment);
+        if (providerPayment.amount() == null || providerPayment.amount().compareTo(payment.getAmount()) != 0
+                || providerPayment.currency() == null || !providerPayment.currency().equalsIgnoreCase(payment.getCurrency())
+                || payment.getProviderMerchantId() == null || !payment.getProviderMerchantId().equals(providerPayment.providerMerchantId())) {
+            throw new ConflictException("Provider payment does not match the expected merchant, amount and currency");
+        }
         PaymentStatus previousStatus = payment.getStatus();
+        if (previousStatus == PaymentStatus.REFUNDED && providerPayment.status() != PaymentStatus.REFUNDED) return;
+        if (previousStatus == PaymentStatus.PARTIALLY_REFUNDED && providerPayment.status() != PaymentStatus.REFUNDED) return;
+        if (previousStatus == PaymentStatus.APPROVED && java.util.Set.of(PaymentStatus.CREATED, PaymentStatus.PENDING,
+                PaymentStatus.CANCELLED, PaymentStatus.REJECTED, PaymentStatus.FAILED).contains(providerPayment.status())) return;
         payment.updateProviderState(
                 providerPayment.status(),
                 providerPayment.providerPaymentId(),
@@ -216,6 +247,10 @@ public class WebhookService {
 
         Order order = payment.getOrder();
         if (providerPayment.status() == PaymentStatus.APPROVED) {
+            // The financial fact survives cancellation; fulfilment and refund policy are separate.
+            if (order.getStatus() == OrderStatus.CANCELLED) {
+                return;
+            }
             if (order.getStatus() != OrderStatus.PAID) {
                 for (OrderItem item : order.getItems()) {
                     inventoryService.commitReservedQuantity(payment.getStore().getId(), item.getProduct().getId(), item.getQuantity());

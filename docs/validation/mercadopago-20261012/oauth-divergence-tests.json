@@ -1,0 +1,18 @@
+{
+  "tests": 72,
+  "oauth_tests": 54,
+  "preflight_tests": 18,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "classification": "LOCAL_UNIT_MOCKED_HTTP",
+  "new_test_methods_this_mission": 16,
+  "reproduction_before_fix": {
+    "tests": 1,
+    "failures": 1,
+    "assertion": "test_token JSON string expected; boolean observed"
+  },
+  "new_authenticated_http_requests_in_local_tests": 0,
+  "real_credentials_used_in_local_tests": false,
+  "log": "/private/tmp/planno-oauth-divergence-tests-4sohsj6o.log"
+}

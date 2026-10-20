@@ -30,12 +30,19 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.UUID;
+import java.time.Clock;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import com.planno.store.order.config.OrderReservationProperties;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class OrderService {
+
+    private final com.planno.store.core.auditing.FinancialLock locks;
 
     private final OrderRepository orderRepository;
     private final CartService cartService;
@@ -47,6 +54,8 @@ public class OrderService {
     private final CurrentActorProvider currentActorProvider;
     private final OrderCodeGenerator orderCodeGenerator;
     private final PaymentRepository paymentRepository;
+    private final OrderReservationProperties reservationProperties;
+    private final Clock reservationClock;
 
     public OrderService(
             OrderRepository orderRepository,
@@ -58,8 +67,12 @@ public class OrderService {
             CurrentStoreProvider currentStoreProvider,
             CurrentActorProvider currentActorProvider,
             OrderCodeGenerator orderCodeGenerator,
-            PaymentRepository paymentRepository
+            PaymentRepository paymentRepository ,
+            com.planno.store.core.auditing.FinancialLock locks,
+            OrderReservationProperties reservationProperties,
+            @Qualifier("orderReservationClock") Clock reservationClock
     ) {
+        this.locks = locks;
         this.orderRepository = orderRepository;
         this.cartService = cartService;
         this.shippingService = shippingService;
@@ -70,13 +83,25 @@ public class OrderService {
         this.currentActorProvider = currentActorProvider;
         this.orderCodeGenerator = orderCodeGenerator;
         this.paymentRepository = paymentRepository;
+        this.reservationProperties = reservationProperties;
+        this.reservationClock = reservationClock;
     }
 
     @Transactional
     public StoreOrderResponse create(CreateOrderRequest request) {
-        Cart cart = cartService.getCurrentActiveCart();
-        if (!cart.getId().equals(request.cartId())) {
-            throw new BusinessException(HttpStatus.BAD_REQUEST, "Requested cart does not match the active cart context");
+        Cart cart = cartService.getCurrentCartForCheckout(request.cartId());
+        if (cart.getStatus() == com.planno.store.cart.domain.CartStatus.CHECKED_OUT) {
+            Order existing = orderRepository.findByStoreIdAndCartId(currentStoreProvider.getCurrentStoreId(), cart.getId())
+                    .orElseThrow(() -> new BusinessException(HttpStatus.CONFLICT,
+                            "Cart was checked out but its order cannot be recovered"));
+            if (!matchesCheckoutRequest(existing, shippingService.findOrderAddress(existing.getId()), request)) {
+                throw new BusinessException(HttpStatus.CONFLICT,
+                        "Cart was already checked out with different customer or delivery details");
+            }
+            return toResponse(existing);
+        }
+        if (cart.getStatus() != com.planno.store.cart.domain.CartStatus.ACTIVE) {
+            throw new BusinessException(HttpStatus.CONFLICT, "Cart is not available for checkout");
         }
         if (cart.getItems().isEmpty()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "Cannot create an order from an empty cart");
@@ -125,6 +150,8 @@ public class OrderService {
                 shippingMethod.getEstimatedDays()
         );
 
+        order.initializeReservationExpiry(OffsetDateTime.ofInstant(reservationClock.instant(), ZoneOffset.UTC).plus(reservationProperties.ttl()));
+
         for (CartItem item : cart.getItems()) {
             order.addItem(OrderItem.create(
                     order,
@@ -158,6 +185,27 @@ public class OrderService {
         return StoreOrderResponse.from(savedOrder, address, null);
     }
 
+    private boolean matchesCheckoutRequest(Order order, Address address, CreateOrderRequest request) {
+        var requestedAddress = request.address();
+        return order.getShippingMethodId().equals(request.shippingMethodId())
+                && order.getCustomerName().equals(request.customerName().trim())
+                && order.getCustomerEmail().equals(request.customerEmail().trim().toLowerCase(java.util.Locale.ROOT))
+                && java.util.Objects.equals(order.getCustomerDocument(), blankToNull(request.customerDocument()))
+                && address.getRecipientName().equals(requestedAddress.recipientName().trim())
+                && address.getStreet().equals(requestedAddress.street().trim())
+                && address.getNumber().equals(requestedAddress.number().trim())
+                && java.util.Objects.equals(address.getComplement(), blankToNull(requestedAddress.complement()))
+                && address.getNeighborhood().equals(requestedAddress.neighborhood().trim())
+                && address.getCity().equals(requestedAddress.city().trim())
+                && address.getState().equals(requestedAddress.state().trim())
+                && address.getPostalCode().equals(requestedAddress.postalCode().trim())
+                && address.getCountry().equals(requestedAddress.country().trim());
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
     @Transactional(readOnly = true)
     public List<StoreOrderResponse> listAdmin() {
         return orderRepository.findAllByStoreIdOrderByCreatedAtDesc(currentStoreProvider.getCurrentStoreId())
@@ -173,7 +221,7 @@ public class OrderService {
 
     @Transactional
     public StoreOrderResponse updateStatus(UUID orderId, UpdateOrderStatusRequest request) {
-        Order order = getOrderEntity(orderId);
+        Order order = locks.order(getOrderEntity(orderId));
         OrderStatus previousStatus = order.getStatus();
 
         if (request.status() != OrderStatus.CANCELLED) {
@@ -250,10 +298,14 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public StoreOrderResponse getPublic(UUID orderId) {
+        return toResponse(getPublicOrderEntity(orderId));
+    }
+
+    @Transactional(readOnly = true)
+    public Order getPublicOrderEntity(UUID orderId) {
         UUID guestCartId = cartService.getCurrentCheckedOutCart().getId();
-        Order order = orderRepository.findByIdAndStoreIdAndCartId(orderId, currentStoreProvider.getCurrentStoreId(), guestCartId)
+        return orderRepository.findByIdAndStoreIdAndCartId(orderId, currentStoreProvider.getCurrentStoreId(), guestCartId)
                 .orElseThrow(() -> new NotFoundException("Order not found"));
-        return toResponse(order);
     }
 
     private StoreOrderResponse toResponse(Order order) {

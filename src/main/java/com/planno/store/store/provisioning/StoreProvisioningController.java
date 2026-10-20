@@ -39,6 +39,16 @@ public class StoreProvisioningController {
                 configuredToken.getBytes(StandardCharsets.UTF_8), suppliedToken.getBytes(StandardCharsets.UTF_8))) {
             throw new BusinessException(HttpStatus.UNAUTHORIZED, "Invalid service token");
         }
+        String idempotencyHeader = httpRequest.getHeader("Idempotency-Key");
+        String requestKey = request.idempotencyKey();
+        if (idempotencyHeader == null || idempotencyHeader.isBlank()
+                || !idempotencyHeader.equals(idempotencyHeader.trim())
+                || !requestKey.equals(requestKey.trim())
+                || !MessageDigest.isEqual(idempotencyHeader.getBytes(StandardCharsets.UTF_8),
+                        requestKey.getBytes(StandardCharsets.UTF_8))) {
+            throw new BusinessException(HttpStatus.CONFLICT,
+                    "Idempotency-Key header must match the request body");
+        }
         return ResponseEntity.status(HttpStatus.CREATED).body(service.provision(request));
     }
 

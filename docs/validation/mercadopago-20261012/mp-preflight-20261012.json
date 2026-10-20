@@ -1,0 +1,28 @@
+{
+  "timestamp_utc": "2026-10-12T10:45:21.155887+00:00",
+  "classification": "REAL_HTTP_TEST_CREDENTIALS_READ_ONLY",
+  "host": "api.mercadopago.com",
+  "credentials_prefix_checked": "TEST",
+  "mutating_requests": 0,
+  "raw_responses_saved": false,
+  "observations": [
+    {
+      "operation": "payment_methods",
+      "method": "GET",
+      "http_status": 200,
+      "body_sha256": "ba94065beb03ae9efd6a22f8d8ca6b9e31c770823b139171e5d7adca7ddd2a40",
+      "json_response": true,
+      "payment_method_count": 20,
+      "visa_present": true
+    },
+    {
+      "operation": "search_synthetic_reference",
+      "method": "GET",
+      "http_status": 200,
+      "body_sha256": "47c1cdbcaffb6d2e8b50124412f4f7cc3728a05bb956295be7345a55f29607d6",
+      "json_response": true,
+      "result_count": 0,
+      "synthetic_reference_only": true
+    }
+  ]
+}

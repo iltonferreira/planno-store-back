@@ -24,31 +24,41 @@ public class AuthService {
     private final JwtProperties jwtProperties;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmailTwoFactorService emailTwoFactorService;
 
     public AuthService(
             AuthenticationManager authenticationManager,
             JwtService jwtService,
             JwtProperties jwtProperties,
             UserRepository userRepository,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            EmailTwoFactorService emailTwoFactorService
     ) {
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
         this.jwtProperties = jwtProperties;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.emailTwoFactorService = emailTwoFactorService;
     }
 
+    @Transactional
     public AuthResponse login(LoginRequest request) {
         var authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.email(), request.password())
         );
 
         AuthenticatedUser user = (AuthenticatedUser) authentication.getPrincipal();
-        String token = jwtService.generateToken(user);
-
         var account = userRepository.findByEmailIgnoreCase(user.getUsername())
                 .orElseThrow(() -> new IllegalStateException("Authenticated user not found"));
+        if (request.emailCode() == null || request.emailCode().isBlank()) {
+            emailTwoFactorService.sendCode(user.getUserId());
+            throw new EmailFactorRequiredException();
+        }
+        if (!emailTwoFactorService.consumeCode(user.getUserId(), request.emailCode())) {
+            throw new org.springframework.security.authentication.BadCredentialsException("Invalid email or password");
+        }
+        String token = jwtService.generateToken(user);
         return new AuthResponse(
                 token,
                 "Bearer",

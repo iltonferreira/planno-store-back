@@ -19,6 +19,11 @@ import java.time.OffsetDateTime;
 @Table(name = "coupons")
 public class Coupon extends AuditableEntity {
 
+    @jakarta.persistence.Version
+    @jakarta.persistence.Column(nullable = false)
+    private long version;
+
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "store_id", nullable = false)
     private Store store;

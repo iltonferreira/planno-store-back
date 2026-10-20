@@ -45,6 +45,7 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
 
         String first = mockMvc.perform(post("/internal/stores/provision")
                         .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .header("Idempotency-Key", request.idempotencyKey())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -56,6 +57,7 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
 
         mockMvc.perform(post("/internal/stores/provision")
                         .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .header("Idempotency-Key", request.idempotencyKey())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
@@ -76,6 +78,7 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
                 "INITIAL", "admin@aurora.example.test", "Ana Admin", null);
         String provisioned = mockMvc.perform(post("/internal/stores/provision")
                         .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .header("Idempotency-Key", request.idempotencyKey())
                         .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         String storeId = objectMapper.readTree(provisioned).get("storeId").asText();
@@ -90,10 +93,17 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
                 .andReturn().getResponse().getContentAsString();
         String temporaryPassword = objectMapper.readTree(credentials).get("temporaryPassword").asText();
 
+        var temporaryLoginRequest = new com.planno.store.identity.dto.LoginRequest(
+                "admin@aurora.example.test", temporaryPassword);
+        mockMvc.perform(post("/api/v1/auth/login").header(STORE_HEADER, "loja-aurora")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(temporaryLoginRequest)))
+                .andExpect(status().isPreconditionRequired());
+        String temporaryCode = lastEmailCode();
         String login = mockMvc.perform(post("/api/v1/auth/login").header(STORE_HEADER, "loja-aurora")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new com.planno.store.identity.dto.LoginRequest(
-                                "admin@aurora.example.test", temporaryPassword))))
+                                "admin@aurora.example.test", temporaryPassword, temporaryCode))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.mustChangePassword").value(true))
                 .andReturn().getResponse().getContentAsString();
         String token = objectMapper.readTree(login).get("accessToken").asText();
@@ -106,15 +116,31 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
                         .content("{\"currentPassword\":\"" + temporaryPassword + "\",\"newPassword\":\"Aurora-Owner-New-Password-2026!\"}"))
                 .andExpect(status().isNoContent());
 
-        String updatedLogin = mockMvc.perform(post("/api/v1/auth/login").header(STORE_HEADER, "loja-aurora")
+        mockMvc.perform(post("/api/v1/auth/login").header(STORE_HEADER, "loja-aurora")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"admin@aurora.example.test\",\"password\":\"Aurora-Owner-New-Password-2026!\"}"))
+                .andExpect(status().isPreconditionRequired());
+        String updatedCode = lastEmailCode();
+        String updatedLogin = mockMvc.perform(post("/api/v1/auth/login").header(STORE_HEADER, "loja-aurora")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new com.planno.store.identity.dto.LoginRequest(
+                                "admin@aurora.example.test", "Aurora-Owner-New-Password-2026!", updatedCode))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.mustChangePassword").value(false))
                 .andReturn().getResponse().getContentAsString();
         String authenticated = objectMapper.readTree(updatedLogin).get("accessToken").asText();
         mockMvc.perform(get("/api/v1/admin/store/current").header(STORE_HEADER, "loja-aurora")
                         .header("Authorization", "Bearer " + authenticated))
                 .andExpect(status().isOk());
+    }
+
+    private String lastEmailCode() {
+        org.mockito.ArgumentCaptor<org.springframework.mail.SimpleMailMessage> message =
+                org.mockito.ArgumentCaptor.forClass(org.springframework.mail.SimpleMailMessage.class);
+        org.mockito.Mockito.verify(javaMailSender, org.mockito.Mockito.atLeastOnce()).send(message.capture());
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("(?<![0-9])[0-9]{6}(?![0-9])")
+                .matcher(message.getValue().getText());
+        org.assertj.core.api.Assertions.assertThat(matcher.find()).isTrue();
+        return matcher.group();
     }
 
     @Test
@@ -125,6 +151,7 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
 
         mockMvc.perform(post("/internal/stores/provision")
                         .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .header("Idempotency-Key", request.idempotencyKey())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict());
@@ -138,6 +165,7 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
                 "INITIAL", "admin@example.com", "Ana Admin", "loja-dominios.planno.online");
         String body = mockMvc.perform(post("/internal/stores/provision")
                         .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .header("Idempotency-Key", request.idempotencyKey())
                         .contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         String storeId = objectMapper.readTree(body).get("storeId").asText();
@@ -177,11 +205,13 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
 
         mockMvc.perform(post("/internal/stores/provision")
                         .contentType(MediaType.APPLICATION_JSON)
+                        .header("Idempotency-Key", request.idempotencyKey())
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized());
 
         mockMvc.perform(post("/internal/stores/provision")
                         .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .header("Idempotency-Key", request.idempotencyKey())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated());
@@ -191,9 +221,49 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
                 "INITIAL", "admin@example.com", "Ana Admin", null);
         mockMvc.perform(post("/internal/stores/provision")
                         .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .header("Idempotency-Key", changed.idempotencyKey())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(changed)))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void hubProvisioningRejectsMissingOrMismatchedIdempotencyHeader() throws Exception {
+        StoreProvisioningRequest request = new StoreProvisioningRequest("hub-request-key-001", "Loja Protegida",
+                "loja-chave", "contato@example.com", "Maria Silva", "Empresa Exemplo", null, null,
+                "INITIAL", "admin-chave@example.com", "Ana Admin", null);
+
+        mockMvc.perform(post("/internal/stores/provision")
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict());
+
+        mockMvc.perform(post("/internal/stores/provision")
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .header("Idempotency-Key", "different-key")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict());
+
+        mockMvc.perform(post("/internal/stores/provision")
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .header("Idempotency-Key", request.idempotencyKey())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new StoreProvisioningRequest(
+                                " " + request.idempotencyKey() + " ", "Loja Protegida", "loja-chave",
+                                "contato@example.com", "Maria Silva", "Empresa Exemplo", null, null,
+                                "INITIAL", "admin-chave@example.com", "Ana Admin", null))))
+                .andExpect(status().isConflict());
+
+        mockMvc.perform(post("/internal/stores/provision")
+                        .header("X-Planno-Service-Token", PROVISIONING_TOKEN)
+                        .header("Idempotency-Key", " " + request.idempotencyKey() + " ")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict());
+
+        org.assertj.core.api.Assertions.assertThat(storeRepository.count()).isZero();
     }
 
     @Test
@@ -304,7 +374,7 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
         String adminToken = tokenFor(admin.getEmail());
         String platformToken = platformAdminToken("platform-assets@example.com");
 
-        MockMultipartFile file = new MockMultipartFile("file", "banner.png", "image/png", "fake-image".getBytes(StandardCharsets.UTF_8));
+        MockMultipartFile file = new MockMultipartFile("file", "banner.png", "image/png", validPng());
 
         mockMvc.perform(multipart("/api/v1/admin/store/current/assets/banner")
                         .file(file)
@@ -315,7 +385,7 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
                 .andExpect(jsonPath("$.publicUrl").value(notNullValue()));
 
         mockMvc.perform(multipart("/api/v1/platform/stores/{storeId}/assets/logo", store.getId())
-                        .file(new MockMultipartFile("file", "logo.png", "image/png", "fake-image".getBytes(StandardCharsets.UTF_8)))
+                        .file(new MockMultipartFile("file", "logo.png", "image/png", validPng()))
                         .header("Authorization", "Bearer " + platformToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.bucket").value("store-assets-test"))
@@ -502,6 +572,30 @@ class PlatformStoreAndPublicContractsIntegrationTests extends AbstractIntegratio
     private AddressRequest sampleAddress() {
         return new AddressRequest("Cliente Teste", "Rua Principal", "100", "Apto 10", "Centro",
                 "Sao Paulo", "SP", "01001000", "BR");
+    }
+
+    @Test
+    void rejectsSpoofedImagesAndActiveSvgUploads() throws Exception {
+        Store store = createStore("upload-security");
+        User admin = createUser("upload-security@example.com", "password123");
+        assignRole(admin, RoleName.ADMIN, store);
+        String token = tokenFor(admin.getEmail());
+        for (String type : java.util.List.of("image/png", "image/jpeg", "image/webp", "image/svg+xml")) {
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/api/v1/admin/store/current/assets/logo")
+                    .file(new MockMultipartFile("file", "logo.png", type, "<svg onload='alert(1)'/>".getBytes(StandardCharsets.UTF_8)))
+                    .header(STORE_HEADER, "upload-security").header("Authorization", "Bearer " + token))
+                    .andExpect(status().isBadRequest());
+        }
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/api/v1/admin/store/current/assets/logo")
+                .file(new MockMultipartFile("file", "logo.jpg", "image/jpeg", validPng()))
+                .header(STORE_HEADER, "upload-security").header("Authorization", "Bearer " + token))
+                .andExpect(status().isBadRequest());
+    }
+
+    private static byte[] validPng() throws Exception {
+        var output = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_RGB), "png", output);
+        return output.toByteArray();
     }
 
     private record Scenario(Store store, String adminToken, UUID orderId, String cartToken) {

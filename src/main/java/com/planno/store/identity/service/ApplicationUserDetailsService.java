@@ -6,6 +6,10 @@ import com.planno.store.identity.domain.UserStatus;
 import com.planno.store.identity.repository.UserRepository;
 import com.planno.store.identity.repository.UserRoleAssignmentRepository;
 import java.util.Set;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.HashSet;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -28,6 +32,7 @@ public class ApplicationUserDetailsService implements UserDetailsService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         var user = userRepository.findByEmailIgnoreCase(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
@@ -44,6 +49,14 @@ public class ApplicationUserDetailsService implements UserDetailsService {
                 .filter(java.util.Objects::nonNull)
                 .collect(java.util.stream.Collectors.toSet());
 
+        Map<UUID, Set<String>> storeRoles = new HashMap<>();
+        for (var assignment : assignments) {
+            if (assignment.getStore() != null) {
+                storeRoles.computeIfAbsent(assignment.getStore().getId(), ignored -> new HashSet<>())
+                        .add("ROLE_" + assignment.getRole().getName().name());
+            }
+        }
+
         return new AuthenticatedUser(
                 user.getId(),
                 user.getEmail(),
@@ -51,6 +64,7 @@ public class ApplicationUserDetailsService implements UserDetailsService {
                 user.getStatus() == UserStatus.ACTIVE,
                 user.mustChangePassword(),
                 storeIds,
+                storeRoles,
                 authorities
         );
     }

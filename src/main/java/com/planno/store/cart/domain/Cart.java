@@ -22,6 +22,11 @@ import java.util.UUID;
 @Table(name = "carts")
 public class Cart extends AuditableEntity {
 
+    @jakarta.persistence.Version
+    @jakarta.persistence.Column(nullable = false)
+    private long version;
+
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "store_id", nullable = false)
     private Store store;
