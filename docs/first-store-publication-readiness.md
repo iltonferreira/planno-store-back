@@ -26,7 +26,7 @@
 4. Confirmar DNS, certificado TLS e disponibilidade do domínio da loja após publicação de homologação.
 5. Completar as decisões comerciais documentadas em `docs/financial-blockers-fixes.md`, `docs/mercadopago-oauth-divergence.md` e `docs/mercadopago-test-validation.md`; depois verificar checkout, confirmação, cancelamento, estorno e reconciliação somente com sandbox e valores de teste.
 6. Confirmar dados do lojista, catálogo, estoque, preços, política de frete/devolução, contrato e termos de privacidade antes de cadastrar conteúdo de produção.
-7. Concluir commit e push em `homolog` e abrir/atualizar PRs para `deploy`. A publicação de produção fica para depois do merge feito pelo responsável.
+7. Commits e pushes em `homolog` foram concluídos nos três repositórios. O PR do site [#12](https://github.com/plannocorp/planno-site/pull/12) foi atualizado. A criação dos PRs da Store e do Hub foi bloqueada pela integração GitHub disponível: `403 Resource not accessible by integration` na Store e `404 Not Found` no Hub; o GitHub CLI não está instalado. Assim que o conector com escrita nesses repositórios estiver habilitado, abrir [Store homolog → deploy](https://github.com/iltonferreira/planno-store-back/compare/deploy...homolog?expand=1) e [Hub homolog → deploy](https://github.com/iltonferreira/planno-hub/compare/deploy...homolog?expand=1). A publicação de produção fica para depois do merge feito pelo responsável.
 
 ## Limites desta entrega
 
